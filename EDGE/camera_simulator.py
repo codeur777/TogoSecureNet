@@ -6,14 +6,14 @@ import numpy as np
 import face_recognition
 from config import *
 from mqtt_client import TogoMQTTClient
-from face_detector import TogoFaceDetector
+from face_detector import TogoSecureAI
 
 def main():
     print(f"Démarrage de la caméra {CAMERA_ID} ({CAMERA_LOCATION})...")
     
     # Initialisation
     mqtt = TogoMQTTClient()
-    detector = TogoFaceDetector()
+    detector = TogoSecureAI()
     
     # Capture vidéo (0 = webcam par défaut)
     cap = cv2.VideoCapture(0)
@@ -34,15 +34,17 @@ def main():
             
             # Analyser à intervalle régulier
             if current_time - last_analysis_time > ANALYSIS_INTERVAL:
-                # Détection de visages
+                # Analyse hybride (YOLO + Face Rec)
                 results = detector.analyze_frame(frame)
                 
-                for res in results:
-                    if res['known']:
-                        print(f"Alerte! Personne détectée: {res['name']}")
-                        mqtt.publish_alert(res['person_id'], res['name'])
+                print(f"--- Analyse: {results['persons_count']} personne(s) détectée(s) ---")
+                
+                for det in results['detections']:
+                    if det['is_wanted']:
+                        print(f"ALERTE CRITIQUE! {det['name']} identifié!")
+                        mqtt.publish_alert(det['person_id'], det['name'])
                     else:
-                        print("Visage inconnu détecté")
+                        print("Présence inconnue détectée")
                 
                 last_analysis_time = current_time
                 

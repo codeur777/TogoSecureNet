@@ -1,33 +1,32 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Styles Leaflet */
+@import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
 :root {
-  /* Color Palette - Premium Dark Mode by default */
-  --bg-main: #0f1117;
-  --bg-card: rgba(255, 255, 255, 0.05);
-  --bg-sidebar: #161922;
-  --accent-primary: #8b5cf6; /* Violet-500 */
-  --accent-secondary: #3b82f6; /* Blue-500 */
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --border-color: rgba(255, 255, 255, 0.1);
+  /* Color Palette - Deep Premium Dark Mode */
+  --bg-main: #0a0c10;
+  --bg-card: rgba(30, 41, 59, 0.5);
+  --bg-sidebar: #0f172a;
+  --accent-primary: #8b5cf6;
+  --accent-secondary: #3b82f6;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --border-color: rgba(255, 255, 255, 0.08);
   
-  --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --sans: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
 
   background-color: var(--bg-main);
   color: var(--text-primary);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
 }
 
 body {
   margin: 0;
   overflow-x: hidden;
+  background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0a0c10 100%);
+  min-height: 100vh;
 }
 
 /* Custom Scrollbar */

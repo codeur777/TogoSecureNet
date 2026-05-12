@@ -17,12 +17,12 @@ async def lifespan(app: FastAPI):
     yield
     # Cleanup si besoin
 
-app = FastAPI(title="Togo SecureNet API", version="1.0.0", lifespan=lifspan)
+app = FastAPI(title="Togo SecureNet API", version="1.0.0", lifespan=lifespan)
 
-# CORS pour permettre au frontend React d'appeler l'API
+# CORS pour permettre au frontend d'appeler l'API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

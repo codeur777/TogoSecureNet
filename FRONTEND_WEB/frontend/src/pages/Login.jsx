@@ -43,61 +43,83 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0f1117] relative overflow-hidden">
-      {/* Background blobs for premium look */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[120px]"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[120px]"></div>
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0c10] relative overflow-hidden font-['Outfit']">
+      {/* Dynamic Background Elements */}
+      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-purple-600/10 rounded-full blur-[140px] animate-pulse"></div>
+      <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[140px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+      <div className="absolute top-[20%] right-[10%] w-[30%] h-[30%] bg-emerald-500/5 rounded-full blur-[100px]"></div>
       
-      <div className="w-full max-w-md p-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl z-10">
+      {/* Glassmorphism Card */}
+      <div className="w-full max-w-md p-10 bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] z-10 transition-all duration-500 hover:border-white/20">
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-purple-600 to-blue-600 rounded-2xl mb-4 shadow-lg shadow-purple-500/30">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="relative inline-flex items-center justify-center w-20 h-20 bg-gradient-to-tr from-purple-600 to-blue-600 rounded-3xl mb-6 shadow-[0_12px_40px_-8px_rgba(147,51,234,0.4)] group overflow-hidden">
+            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <svg className="w-10 h-10 text-white relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Togo SecureNet</h1>
-          <p className="text-gray-400">Plateforme de surveillance intelligente</p>
+          <h1 className="text-4xl font-bold text-white mb-3 tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-400">
+            SecureNet
+          </h1>
+          <p className="text-slate-400 font-medium tracking-wide">SURVEILLANCE INTELLIGENTE · TOGO</p>
         </div>
         
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Email professionnel</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-600/50 transition-all"
-              placeholder="admin@togosecurenet.tg"
-              required
-            />
+        <form onSubmit={handleLogin} className="space-y-7">
+          <div className="group">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 ml-1">Email Professionnel</label>
+            <div className="relative">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-5 py-4 bg-white/[0.04] border border-white/10 rounded-2xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500/40 transition-all duration-300"
+                placeholder="admin@togosecurenet.tg"
+                required
+              />
+            </div>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Mot de passe</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-600/50 transition-all"
-              placeholder="••••••••"
-              required
-            />
+          <div className="group">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 ml-1">Mot de Passe</label>
+            <div className="relative">
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-5 py-4 bg-white/[0.04] border border-white/10 rounded-2xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500/40 transition-all duration-300"
+                placeholder="••••••••"
+                required
+              />
+            </div>
           </div>
           
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-purple-600/20 transform transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4.5 bg-white text-black font-bold rounded-2xl shadow-[0_10px_20px_-5px_rgba(255,255,255,0.2)] transform transition-all hover:bg-slate-100 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed text-lg"
           >
-            {loading ? 'Connexion en cours...' : 'Se connecter'}
+            {loading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Vérification...
+              </span>
+            ) : 'Accéder au Terminal'}
           </button>
         </form>
         
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-500">
-            Accès réservé aux forces de l'ordre et administrateurs autorisés.
+        <div className="mt-10 text-center">
+          <p className="text-xs text-slate-600 font-medium tracking-tighter leading-relaxed">
+            SYSTÈME SÉCURISÉ · TOUTE TENTATIVE D'ACCÈS NON AUTORISÉE SERA ENREGISTRÉE ET SIGNALÉE AUX AUTORITÉS COMPÉTENTES.
           </p>
         </div>
+      </div>
+      
+      {/* Subtle footer decorative element */}
+      <div className="absolute bottom-8 text-slate-800 text-[10px] font-black tracking-[0.5em] uppercase">
+        Republic of Togo · Security Intelligence Division
       </div>
     </div>
   );
