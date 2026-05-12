@@ -1,0 +1,93 @@
+services:
+
+  # ── PostgreSQL + pgvector ──────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg14
+    container_name: tsg_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: togo_securenet
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d togo_securenet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: tsg_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── EMQX (MQTT broker) ────────────────────────────────────────────────────
+  emqx:
+    image: emqx/emqx:latest
+    container_name: tsg_emqx
+    restart: unless-stopped
+    ports:
+      - "1884:1883"   # MQTT  (1883 hôte déjà pris → on expose sur 1884)
+      - "8085:8083"   # WebSocket
+      - "8086:8084"   # WebSocket SSL
+      - "18084:18083" # Dashboard EMQX
+    environment:
+      EMQX_NAME: emqx
+      EMQX_HOST: 127.0.0.1
+
+  # ── Backend FastAPI ────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./BACKEND
+      dockerfile: Dockerfile
+    container_name: tsg_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      emqx:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://admin:postgres@postgres:5432/togo_securenet
+      REDIS_URL: redis://redis:6379
+      MQTT_BROKER: emqx
+      MQTT_PORT: 1883
+      SECRET_KEY: your_super_secret_key_change_me
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      ADMIN_EMAIL: admin@togosecurenet.tg
+      ADMIN_PASSWORD: admin123
+    volumes:
+      - ./BACKEND:/app
+
+  # ── Frontend Vite/React ────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./FRONTEND_WEB/frontend
+      dockerfile: Dockerfile
+    container_name: tsg_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:8000
+
+volumes:
+  postgres_data:

@@ -1,0 +1,48 @@
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.database import engine
+from app.models import Base
+from app.core.config import settings
+from app.api import auth, persons, cameras, alerts, websocket, dashboard
+from app.mqtt_client import start_mqtt
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Créer les tables si elles n'existent pas
+    Base.metadata.create_all(bind=engine)
+    # Démarrage du bridge MQTT
+    start_mqtt()
+    yield
+    # Cleanup si besoin
+
+app = FastAPI(title="Togo SecureNet API", version="1.0.0", lifespan=lifspan)
+
+# CORS pour permettre au frontend React d'appeler l'API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Servir les fichiers média
+app.mount("/static", StaticFiles(directory="uploads"), name="static")
+
+# Routes
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+app.include_router(persons.router, prefix="/api/v1/persons", tags=["Persons"])
+app.include_router(cameras.router, prefix="/api/v1/cameras", tags=["Cameras"])
+app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts"])
+app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
+app.include_router(websocket.router, prefix="/ws", tags=["WebSocket"])
+
+@app.get("/")
+def root():
+    return {"message": "Togo SecureNet API is running"}
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
