@@ -1,6 +1,0 @@
-opencv-python
-face_recognition
-paho-mqtt
-numpy
-requests
-ultralytics

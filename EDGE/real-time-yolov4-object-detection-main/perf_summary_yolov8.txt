@@ -1,0 +1,3 @@
+Model: YOLOv8-nano
+Inference Time (CPU): 713.20 ms
+Detections Count: 1

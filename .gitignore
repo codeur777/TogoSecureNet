@@ -10,8 +10,30 @@ dist/
 build/
 *.egg
 venv/
+.venv/
+venv*/
 .env
 *.log
+*.pkl
+*.pt
+*.onnx
+*.pb
+*.h5
+*.jpg
+*.png
+*.jpeg
+*.mp4
+*.avi
+
+# ===========================
+# Datasets & Temp Directories
+# ===========================
+**/lfw-deepfunneled/
+**/cropped_faces/
+**/norm_faces/
+**/embeddings/
+**/vids/
+
 
 # ===========================
 # Node.js / React Frontend
