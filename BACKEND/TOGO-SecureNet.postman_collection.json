@@ -1,0 +1,496 @@
+{
+	"info": {
+		"name": "TOGO-SecureNet API",
+		"description": "Collection complète pour tester tous les endpoints de TOGO-SecureNet",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "1. Authentication",
+			"item": [
+				{
+					"name": "Login Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set('token', jsonData.access_token);",
+									"    pm.environment.set('token', jsonData.access_token);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "admin@togosecurenet.tg"
+								},
+								{
+									"key": "password",
+									"value": "admin123"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "Signup Citoyen",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"citoyen.test@example.com\",\n  \"password\": \"test123\",\n  \"first_name\": \"Jean\",\n  \"last_name\": \"Dupont\",\n  \"phone\": \"+228 90 00 00 01\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/signup",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "signup"]
+						}
+					}
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "me"]
+						}
+					}
+				},
+				{
+					"name": "Change Password",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"current_password\": \"admin123\",\n  \"new_password\": \"newpassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/change-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "change-password"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Signalements",
+			"item": [
+				{
+					"name": "Créer Signalement Personne",
+					"request": {
+						"auth": {"type": "noauth"},
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"declarant_nom\": \"Marie Kouassi\",\n  \"type_signalement\": \"personne_disparue\",\n  \"declarant_contact\": \"+228 90 11 22 33\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/signalements",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "signalements"]
+						}
+					}
+				},
+				{
+					"name": "Liste Signalements",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/signalements",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "signalements"]
+						}
+					}
+				},
+				{
+					"name": "Valider Signalement",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/signalements/{signalement_id}/valider",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "signalements", "{signalement_id}", "valider"]
+						}
+					}
+				},
+				{
+					"name": "Rejeter Signalement",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/signalements/{signalement_id}/rejeter",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "signalements", "{signalement_id}", "rejeter"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Personnes Disparues",
+			"item": [
+				{
+					"name": "Liste Personnes Disparues",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/personnes-disparues",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "personnes-disparues"]
+						}
+					}
+				},
+				{
+					"name": "Créer Personne Disparue",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nom\": \"Agbeko\",\n  \"prenoms\": \"Kofi\",\n  \"description\": \"Homme de taille moyenne\",\n  \"age\": \"35\",\n  \"niveau_gravite\": \"grave\",\n  \"date_disparition\": \"2024-06-01\",\n  \"lieu_disparition\": \"Lomé, Bè\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/personnes-disparues",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "personnes-disparues"]
+						}
+					}
+				},
+				{
+					"name": "Détails Personne Disparue",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/personnes-disparues/{personne_id}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "personnes-disparues", "{personne_id}"]
+						}
+					}
+				},
+				{
+					"name": "Historique Détections",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/personnes-disparues/{personne_id}/detections",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "personnes-disparues", "{personne_id}", "detections"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Engins Volés",
+			"item": [
+				{
+					"name": "Liste Engins Volés",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/engins-voles",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "engins-voles"]
+						}
+					}
+				},
+				{
+					"name": "Créer Engin Volé",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"marque\": \"Yamaha\",\n  \"modele\": \"XTZ 125\",\n  \"couleur\": \"Rouge\",\n  \"type_engin\": \"Moto\",\n  \"plaque_immatriculation\": \"TG-1234-LO\",\n  \"date_vol\": \"2024-05-15\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/engins-voles",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "engins-voles"]
+						}
+					}
+				},
+				{
+					"name": "Rechercher Par Plaque",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/engins-voles/plaque/TG-1234-LO",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "engins-voles", "plaque", "TG-1234-LO"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Détections",
+			"item": [
+				{
+					"name": "Liste Détections",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/detections?skip=0&limit=100",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "detections"],
+							"query": [
+								{"key": "skip", "value": "0"},
+								{"key": "limit", "value": "100"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Créer Détection (IA)",
+					"request": {
+						"auth": {"type": "noauth"},
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"score_confiance\": 0.95,\n  \"image_capture\": \"/captures/det_001.jpg\",\n  \"localisation\": \"Lomé, Grand Marché\",\n  \"type_detection\": \"personne\",\n  \"camera_id\": \"camera-uuid-here\",\n  \"personne_disparue_id\": \"personne-uuid-here\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/detections",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "detections"]
+						}
+					}
+				},
+				{
+					"name": "Détections Par Caméra",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/detections/camera/{camera_id}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "detections", "camera", "{camera_id}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Alertes",
+			"item": [
+				{
+					"name": "Liste Alertes",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/alertes",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "alertes"]
+						}
+					}
+				},
+				{
+					"name": "Alertes Non Lues",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/alertes?est_lue=false",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "alertes"],
+							"query": [{"key": "est_lue", "value": "false"}]
+						}
+					}
+				},
+				{
+					"name": "Marquer Alerte Lue",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/alertes/{alerte_id}/lire",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "alertes", "{alerte_id}", "lire"]
+						}
+					}
+				},
+				{
+					"name": "Count Alertes Non Lues",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/alertes/non-lues/count",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "alertes", "non-lues", "count"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "7. Cameras",
+			"item": [
+				{
+					"name": "Liste Caméras",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/cameras",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "cameras"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "8. Users",
+			"item": [
+				{
+					"name": "Liste Utilisateurs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "users"]
+						}
+					}
+				},
+				{
+					"name": "Créer Utilisateur",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"superviseur.test@togosecurenet.tg\",\n  \"password\": \"super123\",\n  \"first_name\": \"Paul\",\n  \"last_name\": \"Martin\",\n  \"phone\": \"+228 90 55 66 77\",\n  \"role\": \"superviseur\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "users"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "9. Portrait Robot",
+			"item": [
+				{
+					"name": "Options Formulaire",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/portrait-robot/options",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "portrait-robot", "options"]
+						}
+					}
+				},
+				{
+					"name": "Générer Portrait",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Suspect X\",\n  \"age\": 30,\n  \"gender\": \"M\",\n  \"ethnicity\": \"Africain\",\n  \"face_shape\": \"Ovale\",\n  \"skin_tone\": \"Foncé\",\n  \"hair_color\": \"Noir\",\n  \"hair_style\": \"Court\",\n  \"eye_color\": \"Brun\",\n  \"additional_description\": \"Cicatrice sur la joue gauche\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/portrait-robot/generate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "portrait-robot", "generate"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "10. Dashboard & Stats",
+			"item": [
+				{
+					"name": "Dashboard Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/dashboard/stats",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "dashboard", "stats"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Health Check",
+			"request": {
+				"auth": {"type": "noauth"},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/health",
+					"host": ["{{baseUrl}}"],
+					"path": ["health"]
+				}
+			}
+		}
+	]
+}

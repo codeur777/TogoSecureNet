@@ -1,22 +1,46 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, String, Date, DateTime, ForeignKey, Text, Enum as SQLEnum, Float
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import ARRAY
+import enum
+import uuid
+
 from app.core.database import Base
 
-class Person(Base):
-    __tablename__ = "persons"
+class NiveauGraviteEnum(enum.Enum):
+    PAS_GRAVE = "pas_grave"
+    GRAVE = "grave"
+    TRES_GRAVE = "tres_grave"
 
-    id = Column(Integer, primary_key=True, index=True)
-    first_name = Column(String)
-    last_name = Column(String)
-    age = Column(Integer)
-    gender = Column(String)
-    height_cm = Column(Integer)
-    distinctive_signs = Column(String)
-    last_location = Column(String)
-    disappearance_date = Column(Date)
-    gravity_level = Column(String, default="low") # low, high, critical
-    status = Column(String, default="missing") # missing, found, archived
-    photo_url = Column(String)
-    is_ai_ready = Column(Boolean, default=False)
-    ai_metadata = Column(String) # JSON string with analysis details
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+class PersonneDisparue(Base):
+    __tablename__ = "personnes_disparues"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    nom = Column(String, nullable=False)
+    prenoms = Column(String, nullable=False)
+    description = Column(Text)
+    age = Column(String)
+    niveau_gravite = Column(SQLEnum(NiveauGraviteEnum), default=NiveauGraviteEnum.GRAVE)
+    date_disparition = Column(Date)
+    lieu_disparition = Column(String)
+    vecteur_facial = Column(ARRAY(Float))  # Embeddings faciaux
+    photo = Column(ARRAY(String))  # URLs des photos
+    
+    # Foreign Key
+    signalement_id = Column(String, ForeignKey('signalements.id'))
+    
+    # Relations
+    signalement = relationship("Signalement", back_populates="personne_disparue")
+    detections = relationship("Detection", back_populates="personne_disparue")
+    
+    def enregistrer(self):
+        pass
+    
+    def mettre_a_jour_statut(self):
+        pass
+    
+    def get_historique_detection(self):
+        return self.detections
+
+# Alias pour compatibilité
+Person = PersonneDisparue

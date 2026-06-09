@@ -1,0 +1,90 @@
+===============================================
+CONFIGURATION API GEMINI - PORTRAIT-ROBOT
+===============================================
+
+Le système de portrait-robot utilise l'API Google Gemini pour générer
+des portraits réalistes basés sur des descriptions textuelles.
+
+OBTENIR UNE CLÉ API GEMINI
+---------------------------
+
+1. Allez sur: https://makersuite.google.com/app/apikey
+
+2. Connectez-vous avec votre compte Google
+
+3. Cliquez sur "Create API Key"
+
+4. Copiez la clé API générée
+
+5. Ajoutez-la dans le fichier .env :
+   GEMINI_API_KEY=votre_clé_api_ici
+
+ALTERNATIVES DE GÉNÉRATION D'IMAGES
+------------------------------------
+
+Si Gemini ne supporte pas la génération d'images, utilisez:
+
+1. DALL-E (OpenAI)
+   - API: https://platform.openai.com/
+   - Prix: ~$0.02 par image (1024x1024)
+   - Qualité: Excellente
+
+2. Stability AI (Stable Diffusion)
+   - API: https://platform.stability.ai/
+   - Prix: ~$0.002 par image
+   - Qualité: Très bonne
+
+3. Midjourney
+   - Via Discord bot
+   - Abonnement: $10-60/mois
+   - Qualité: Exceptionnelle
+
+CONFIGURATION RECOMMANDÉE
+--------------------------
+
+Pour la production, nous recommandons d'utiliser Stability AI:
+
+1. Créer un compte sur https://platform.stability.ai/
+
+2. Obtenir une clé API
+
+3. Ajouter dans .env:
+   STABILITY_API_KEY=votre_clé_api_ici
+
+4. Le service utilisera automatiquement Stability AI
+
+VERSION DÉMO
+------------
+
+Pour tester sans API, le système utilise un placeholder
+avec des avatars générés aléatoirement via DiceBear.
+
+Cela permet de tester l'interface sans coût.
+
+COÛTS ESTIMÉS
+-------------
+
+- Gemini: Gratuit (quotas limités)
+- DALL-E 3: $0.040 par image (1024x1024)
+- Stable Diffusion: $0.002 par image
+- Midjourney: Abonnement mensuel
+
+Pour un usage modéré (50 portraits/mois):
+- Stability AI: ~$0.10/mois
+- DALL-E: ~$2/mois
+
+SÉCURITÉ
+--------
+
+⚠️ IMPORTANT:
+- Ne jamais commit les clés API dans Git
+- Les clés sont dans .env (ignoré par Git)
+- Renouveler les clés régulièrement
+- Limiter les quotas d'utilisation
+
+SUPPORT
+-------
+
+Pour toute question sur l'intégration:
+- Documentation Gemini: https://ai.google.dev/docs
+- Documentation Stability AI: https://platform.stability.ai/docs

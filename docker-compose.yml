@@ -18,6 +18,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G # Limite la casse sur votre RAM
 
   # ── Redis ──────────────────────────────────────────────────────────────────
   redis:
@@ -31,28 +35,44 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
-  # ── EMQX (MQTT broker) ────────────────────────────────────────────────────
+# ── EMQX (MQTT broker) ────────────────────────────────────────────────────
   emqx:
-    image: emqx/emqx:latest
+    image: emqx/emqx:5.1.0
     container_name: tsg_emqx
     restart: unless-stopped
     ports:
-      - "1884:1883"   # MQTT  (1883 hôte déjà pris → on expose sur 1884)
+      - "1884:1883"   # MQTT 
       - "8085:8083"   # WebSocket
       - "8086:8084"   # WebSocket SSL
       - "18084:18083" # Dashboard EMQX
     environment:
       EMQX_NAME: emqx
       EMQX_HOST: 127.0.0.1
+    # Test de santé officiel et robuste utilisant l'API d'EMQX
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:18083/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
-  # ── Backend FastAPI ────────────────────────────────────────────────────────
+# ── Backend FastAPI ────────────────────────────────────────────────────────
   backend:
     build:
       context: ./BACKEND
       dockerfile: Dockerfile
     container_name: tsg_backend
     restart: unless-stopped
+    env_file:
+      - ./BACKEND/.env
     ports:
       - "8000:8000"
     depends_on:
@@ -61,7 +81,7 @@ services:
       redis:
         condition: service_healthy
       emqx:
-        condition: service_started
+        condition: service_started # Attend que le port MQTT 1883 soit ouvert
     environment:
       DATABASE_URL: postgresql://admin:postgres@postgres:5432/togo_securenet
       REDIS_URL: redis://redis:6379
@@ -72,8 +92,17 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       ADMIN_EMAIL: admin@togosecurenet.tg
       ADMIN_PASSWORD: admin123
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: walterfalisco@gmail.com
+      SMTP_PASSWORD: jhpktzvxzhuacuho
+      SMTP_FROM: walterfalisco@gmail.com
     volumes:
       - ./BACKEND:/app
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   # ── Frontend Vite/React ────────────────────────────────────────────────────
   frontend:
@@ -83,11 +112,19 @@ services:
     container_name: tsg_frontend
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "5174:5174"
     depends_on:
       - backend
     environment:
       VITE_API_URL: http://localhost:8000
+    volumes:
+      - ./FRONTEND_WEB/frontend:/app
+      - /app/node_modules # Protège les modules node du conteneur
+    # Ajout d'un système de build plus léger en ressource si nécessaire
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
 
 volumes:
   postgres_data:
