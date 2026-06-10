@@ -162,3 +162,23 @@ def delete_user(
     db.commit()
     
     return None
+
+@router.put("/me")
+def update_my_profile(
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mettre à jour son propre profil"""
+    if "first_name" in data:
+        current_user.first_name = data["first_name"]
+    if "last_name" in data:
+        current_user.last_name = data["last_name"]
+    if "phone" in data:
+        current_user.phone = data["phone"]
+    
+    current_user.full_name = f"{current_user.first_name} {current_user.last_name}".strip()
+    current_user.updated_at = datetime.utcnow()
+    
+    db.commit()
+    return {"message": "Profil mis à jour"}

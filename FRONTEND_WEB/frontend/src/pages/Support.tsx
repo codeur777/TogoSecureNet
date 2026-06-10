@@ -25,7 +25,7 @@ export default function Support() {
         title="Support | TogoSecureNet"
         description="Contactez le support TogoSecureNet"
       />
-      <PageBreadCrumb pageName="Support" />
+      <PageBreadCrumb pageTitle="Support" />
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Formulaire de contact */}
@@ -91,7 +91,7 @@ export default function Support() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Téléphone</p>
-                <p className="text-gray-800 dark:text-white">+228 XX XX XX XX</p>
+                <p className="text-gray-800 dark:text-white">+228 91 31 76 87</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Heures d'ouverture</p>

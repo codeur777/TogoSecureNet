@@ -52,7 +52,7 @@ export default function UserInfoCard() {
                 Téléphone
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                +228 XX XX XX XX
+                +228 91 31 76 87
               </p>
             </div>
 

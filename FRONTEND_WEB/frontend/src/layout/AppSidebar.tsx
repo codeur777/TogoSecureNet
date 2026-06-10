@@ -181,8 +181,9 @@ const getNavItemsByRole = (role: 'admin' | 'superviseur' | 'citoyen' | 'agent') 
         </svg>
       ),
       name: "Paramètres",
-      path: "/settings",
+      path: "/citoyen/settings",
     },
+    
   ];
 
   if (role === 'admin') {

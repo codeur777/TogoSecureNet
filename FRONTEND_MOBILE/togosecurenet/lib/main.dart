@@ -1,23 +1,37 @@
 import 'package:flutter/material.dart';
-import 'screens/dashboard_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/theme/app_theme.dart';
+import 'core/routes/app_router.dart';
+import 'core/services/notification_service.dart';
 
-void main() {
-  runApp(const TogoSecureNetApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialiser OneSignal
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+  
+  runApp(
+    const ProviderScope(
+      child: TogoSecureNetApp(),
+    ),
+  );
 }
 
-class TogoSecureNetApp extends StatelessWidget {
+class TogoSecureNetApp extends ConsumerWidget {
   const TogoSecureNetApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Togo SecureNet',
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
+
+    return MaterialApp.router(
+      title: 'TogoSecureNet',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
-      ),
-      home: const DashboardScreen(),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      routerConfig: router,
     );
   }
 }

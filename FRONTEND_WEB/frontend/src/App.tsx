@@ -120,6 +120,9 @@ export default function App() {
               <Route path="/citoyen/personnes-disparues" element={<CitoyenPersonnesDisparues />} />
               <Route path="/citoyen/engins-voles" element={<CitoyenEnginsVoles />} />
               <Route path="/citoyen/notifications" element={<CitoyenNotifications />} />
+              <Route path="/citoyen/profile" element={<Profile />} />
+              <Route path="/citoyen/settings" element={<Settings />} />
+              <Route path="/citoyen/support" element={<Support />} />
             </Route>
 
             {/* Fallback Route */}
