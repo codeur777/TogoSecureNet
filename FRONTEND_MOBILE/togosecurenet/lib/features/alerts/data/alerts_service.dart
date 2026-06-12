@@ -1,79 +1,50 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/network/dio_client.dart';
-
-final alertsServiceProvider = Provider<AlertsService>((ref) {
-  return AlertsService(ref.read(dioProvider));
-});
+import '../../../core/models/alert_model.dart';
 
 class AlertsService {
   final Dio _dio;
 
   AlertsService(this._dio);
 
-  // Get all alerts (pour l'agent)
-  Future<List<Map<String, dynamic>>> getAlerts({
-    int? limit,
-    int? offset,
-    String? status,
-  }) async {
+  // Récupérer toutes les alertes
+  Future<List<AlertModel>> getAlerts({AlertStatus? status}) async {
     try {
       final response = await _dio.get(
         '/alertes',
         queryParameters: {
-          if (limit != null) 'limit': limit,
-          if (offset != null) 'offset': offset,
-          if (status != null) 'status': status,
+          if (status != null) 'status': status.name,
         },
       );
-      return List<Map<String, dynamic>>.from(response.data);
+      final List<dynamic> data = response.data is List
+          ? response.data
+          : (response.data['results'] ?? []);
+      return data.map((e) => AlertModel.fromJson(e)).toList();
     } catch (e) {
       rethrow;
     }
   }
 
-  // Get alert by ID
-  Future<Map<String, dynamic>> getAlertById(String alertId) async {
+  // Récupérer une alerte par ID
+  Future<AlertModel> getAlertById(String alertId) async {
     try {
       final response = await _dio.get('/alertes/$alertId');
-      return response.data;
+      return AlertModel.fromJson(response.data);
     } catch (e) {
       rethrow;
     }
   }
 
-  // Get detections (alertes générées par les caméras)
-  Future<List<Map<String, dynamic>>> getDetections({
-    int? limit,
-    int? offset,
-  }) async {
-    try {
-      final response = await _dio.get(
-        '/detections',
-        queryParameters: {
-          if (limit != null) 'limit': limit,
-          if (offset != null) 'offset': offset,
-        },
-      );
-      return List<Map<String, dynamic>>.from(response.data);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // Accept alert (démarrer une intervention)
+  // Accepter une alerte (démarrer intervention)
   Future<Map<String, dynamic>> acceptAlert(String alertId) async {
     try {
-      final response = await _dio.post(
-        '/alertes/$alertId/accept',
-      );
+      final response = await _dio.post('/alertes/$alertId/accept');
       return response.data;
     } catch (e) {
       rethrow;
     }
   }
 
-  // Update alert status
+  // Mettre à jour le statut d'une alerte
   Future<Map<String, dynamic>> updateAlertStatus(
     String alertId,
     String status,
@@ -89,24 +60,45 @@ class AlertsService {
     }
   }
 
-  // Mark as false alert
+  // Marquer comme fausse alerte
   Future<Map<String, dynamic>> markAsFalseAlert(String alertId) async {
     try {
-      final response = await _dio.post(
-        '/alertes/$alertId/false-alert',
-      );
+      final response = await _dio.post('/alertes/$alertId/false-alert');
       return response.data;
     } catch (e) {
       rethrow;
     }
   }
 
-  // Mark person found
+  // Marquer comme lu
+  Future<void> markAsRead(String alertId) async {
+    try {
+      await _dio.patch('/alertes/$alertId', data: {'is_read': true});
+    } catch (e) {
+      // Ignore silently
+    }
+  }
+
+  // Compter les alertes non lues (pending)
+  Future<int> getUnreadCount() async {
+    try {
+      final response = await _dio.get(
+        '/alertes',
+        queryParameters: {'status': 'pending'},
+      );
+      final List<dynamic> data = response.data is List
+          ? response.data
+          : (response.data['results'] ?? []);
+      return data.length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  // Marquer personne retrouvée
   Future<Map<String, dynamic>> markPersonFound(String alertId) async {
     try {
-      final response = await _dio.post(
-        '/alertes/$alertId/person-found',
-      );
+      final response = await _dio.post('/alertes/$alertId/person-found');
       return response.data;
     } catch (e) {
       rethrow;

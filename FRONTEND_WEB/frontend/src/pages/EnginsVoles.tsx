@@ -1,240 +1,231 @@
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import PageMeta from "../components/common/PageMeta";
+import api from "../services/api";
+import { TruckIcon, MagnifyingGlassIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import toast from "react-hot-toast";
 
 interface EnginVole {
-  id: number;
-  type: 'voiture' | 'moto' | 'camion' | 'autre';
+  id: string;
+  type_engin: string;
   marque: string;
   modele: string;
-  immatriculation: string;
+  plaque_immatriculation: string;
   couleur: string;
-  dateVol: string;
-  lieuVol: string;
-  photo: string;
-  statut: 'recherche' | 'retrouve' | 'clos';
-  signalePar: string;
+  date_vol: string;
+  statut: "recherche" | "retrouve" | "clos";
 }
 
 const EnginsVoles = () => {
-  const [engins] = useState<EnginVole[]>([
-    {
-      id: 1,
-      type: "voiture",
-      marque: "Toyota",
-      modele: "Corolla",
-      immatriculation: "TG 1234 AB",
-      couleur: "Blanc",
-      dateVol: "2024-01-20",
-      lieuVol: "Lomé, Kodjoviakopé",
-      photo: "/images/user/user-01.png",
-      statut: "recherche",
-      signalePar: "ATAKPA Paul"
-    },
-  ]);
+  const [engins, setEngins] = useState<EnginVole[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"tous" | "recherche" | "retrouve" | "clos">("tous");
+  const [typeFilter, setTypeFilter] = useState<"tous" | EnginVole["type"]>("tous");
+  const [search, setSearch] = useState("");
 
-  const [filter, setFilter] = useState<'tous' | 'recherche' | 'retrouve' | 'clos'>('tous');
-  const [typeFilter, setTypeFilter] = useState<'tous' | 'voiture' | 'moto' | 'camion' | 'autre'>('tous');
+  const fetchEngins = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/api/v1/engins-voles/");
+      setEngins(Array.isArray(res.data) ? res.data : res.data.results ?? []);
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Impossible de charger les engins volés.");
+      setEngins([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const filteredEngins = engins.filter(e => {
-    const statutMatch = filter === 'tous' ? true : e.statut === filter;
-    const typeMatch = typeFilter === 'tous' ? true : e.type === typeFilter;
-    return statutMatch && typeMatch;
-  });
+  useEffect(() => {
+    fetchEngins();
+  }, [fetchEngins]);
+
+  const handleUpdateStatut = async (id: string, statut: EnginVole["statut"]) => {
+    try {
+      await api.patch(`/api/v1/engins-voles/${id}`, { statut });
+      setEngins((prev) => prev.map((e) => (e.id === id ? { ...e, statut } : e)));
+      toast.success("Statut mis à jour.");
+    } catch {
+      toast.error("Erreur lors de la mise à jour.");
+    }
+  };
 
   const getStatutBadge = (statut: string) => {
     const badges = {
       recherche: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400",
-      retrouve: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400",
-      clos: "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
+      retrouve: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400",
+      clos: "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400",
     };
     return badges[statut as keyof typeof badges] || badges.clos;
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'voiture':
-        return (
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        );
-      case 'moto':
-        return (
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-        );
-    }
+  const getTypeLabel = (t: string) => {
+    const labels = { voiture: "🚗 Voiture", moto: "🏍️ Moto", camion: "🚛 Camion", autre: "🚌 Autre" };
+    return labels[t?.toLowerCase() as keyof typeof labels] || t;
+  };
+
+  const getTypeBgColor = (t: string) => {
+    const colors = { voiture: "bg-blue-50 dark:bg-blue-500/10", moto: "bg-purple-50 dark:bg-purple-500/10", camion: "bg-orange-50 dark:bg-orange-500/10", autre: "bg-gray-50 dark:bg-gray-500/10" };
+    return colors[t?.toLowerCase() as keyof typeof colors] || colors.autre;
+  };
+
+  const filteredEngins = engins.filter((e) => {
+    const matchFilter = filter === "tous" || e.statut === filter;
+    const matchType = typeFilter === "tous" || e.type_engin?.toLowerCase() === typeFilter;
+    const matchSearch = !search ||
+      `${e.marque} ${e.modele}`.toLowerCase().includes(search.toLowerCase()) ||
+      e.plaque_immatriculation?.toLowerCase().includes(search.toLowerCase());
+    return matchFilter && matchType && matchSearch;
+  });
+
+  const stats = {
+    total: engins.length,
+    recherche: engins.filter((e) => e.statut === "recherche").length,
+    retrouve: engins.filter((e) => e.statut === "retrouve").length,
+    clos: engins.filter((e) => e.statut === "clos").length,
   };
 
   return (
     <>
-      <PageMeta
-        title="Engins Volés | TOGO-SecureNet"
-        description="Liste des véhicules et engins volés signalés"
-      />
-      
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90 flex items-center gap-2">
-          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
-          </svg>
-          Engins Volés
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Gérez et consultez les signalements d'engins volés
-        </p>
-      </div>
-      
-      <div className="mb-6 space-y-4">
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => setFilter('tous')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === 'tous'
-                ? 'bg-brand-500 text-white'
-                : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-            }`}
-          >
-            Tous
-          </button>
-          <button
-            onClick={() => setFilter('recherche')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === 'recherche'
-                ? 'bg-red-500 text-white'
-                : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-            }`}
-          >
-            En recherche
-          </button>
-          <button
-            onClick={() => setFilter('retrouve')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === 'retrouve'
-                ? 'bg-green-500 text-white'
-                : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-            }`}
-          >
-            Retrouvés
-          </button>
-          <button
-            onClick={() => setFilter('clos')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === 'clos'
-                ? 'bg-gray-500 text-white'
-                : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-            }`}
-          >
-            Clos
-          </button>
-        </div>
+      <PageMeta title="Engins Volés | TOGO-SecureNet" description="Gestion des signalements de véhicules volés" />
 
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => setTypeFilter('tous')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              typeFilter === 'tous'
-                ? 'bg-brand-500 text-white'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
-            }`}
-          >
-            Tous les types
-          </button>
-          <button
-            onClick={() => setTypeFilter('voiture')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              typeFilter === 'voiture'
-                ? 'bg-brand-500 text-white'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
-            }`}
-          >
-            Voitures
-          </button>
-          <button
-            onClick={() => setTypeFilter('moto')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              typeFilter === 'moto'
-                ? 'bg-brand-500 text-white'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
-            }`}
-          >
-            Motos
-          </button>
-          <button
-            onClick={() => setTypeFilter('camion')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              typeFilter === 'camion'
-                ? 'bg-brand-500 text-white'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
-            }`}
-          >
-            Camions
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredEngins.map((engin) => (
-          <div
-            key={engin.id}
-            className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition"
-          >
-            <div className="relative">
-              <img
-                src={engin.photo}
-                alt={`${engin.marque} ${engin.modele}`}
-                className="w-full h-48 object-cover"
-              />
-              <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-semibold ${getStatutBadge(engin.statut)}`}>
-                {engin.statut === 'recherche' ? 'En recherche' : 
-                 engin.statut === 'retrouve' ? 'Retrouvé' : 'Clos'}
-              </span>
-              <div className="absolute top-4 left-4 bg-white dark:bg-gray-900 rounded-full p-2">
-                {getTypeIcon(engin.type)}
-              </div>
+      <div className="space-y-6">
+        {/* En-tête */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 rounded-xl shrink-0">
+              <TruckIcon className="h-6 w-6" />
             </div>
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
-                {engin.marque} {engin.modele}
-              </h3>
-              <p className="text-2xl font-bold text-brand-500 mb-4">{engin.immatriculation}</p>
-              <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                <p><span className="font-semibold">Couleur:</span> {engin.couleur}</p>
-                <p><span className="font-semibold">Date vol:</span> {new Date(engin.dateVol).toLocaleDateString('fr-FR')}</p>
-                <p><span className="font-semibold">Lieu:</span> {engin.lieuVol}</p>
-                <p><span className="font-semibold">Signalé par:</span> {engin.signalePar}</p>
-              </div>
-              <div className="mt-4 flex gap-2">
-                <button className="flex-1 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition text-sm font-medium">
-                  Détails
-                </button>
-                <button className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition text-sm font-medium">
-                  Modifier
-                </button>
-              </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Engins Volés</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                {stats.recherche} en recherche · {stats.retrouve} retrouvé{stats.retrouve !== 1 ? "s" : ""}
+              </p>
             </div>
           </div>
-        ))}
-      </div>
-
-      {filteredEngins.length === 0 && (
-        <div className="text-center py-12">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Aucun engin trouvé</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Aucun résultat pour ces filtres.
-          </p>
+          <div className="flex items-center gap-2">
+            <button onClick={fetchEngins} title="Actualiser"
+              className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+              <ArrowPathIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* Métriques */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Total", value: stats.total, color: "text-gray-800 dark:text-white" },
+            { label: "En recherche", value: stats.recherche, color: "text-red-600 dark:text-red-400" },
+            { label: "Retrouvés", value: stats.retrouve, color: "text-emerald-600 dark:text-emerald-400" },
+            { label: "Clos", value: stats.clos, color: "text-gray-500 dark:text-gray-400" },
+          ].map((m) => (
+            <div key={m.label} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{m.label}</p>
+              <p className={`text-2xl font-bold mt-1 ${m.color}`}>{m.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Recherche + Filtres */}
+        <div className="space-y-3">
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input type="text" placeholder="Rechercher par marque, immatriculation ou lieu..." value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/[0.03] rounded-xl dark:text-white focus:outline-none focus:border-orange-500 transition-colors"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="text-xs font-semibold text-gray-400 uppercase self-center mr-1">Statut:</span>
+            {(["tous", "recherche", "retrouve", "clos"] as const).map((f) => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  filter === f
+                    ? f === "recherche" ? "bg-red-600 text-white" : f === "retrouve" ? "bg-emerald-600 text-white" : f === "clos" ? "bg-gray-500 text-white" : "bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900"
+                    : "bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400"
+                }`}>
+                {f === "tous" ? "Tous" : f === "recherche" ? "En recherche" : f === "retrouve" ? "Retrouvés" : "Clos"}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="text-xs font-semibold text-gray-400 uppercase self-center mr-1">Type:</span>
+            {(["tous", "voiture", "moto", "camion", "autre"] as const).map((t) => (
+              <button key={t} onClick={() => setTypeFilter(t)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  typeFilter === t
+                    ? "bg-orange-600 text-white"
+                    : "bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400"
+                }`}>
+                {t === "tous" ? "Tous les types" : getTypeLabel(t)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Grille des engins */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse">
+                <div className="w-full h-48 bg-gray-200 dark:bg-gray-700"></div>
+                <div className="p-5 space-y-2">
+                  <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredEngins.length === 0 ? (
+          <div className="text-center py-16">
+            <TruckIcon className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" />
+            <p className="text-sm text-gray-400 font-medium">
+              {search || filter !== "tous" || typeFilter !== "tous" ? "Aucun engin ne correspond aux filtres." : "Aucun signalement enregistré."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredEngins.map((engin) => (
+              <div key={engin.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="relative">
+                  <img
+                    src={`https://via.placeholder.com/400x200/f97316/fff?text=${encodeURIComponent(e.marque)}`}
+                    alt={`${e.marque} ${e.modele}`}
+                    className="w-full h-48 object-cover"
+                  />
+                  <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-semibold ${getStatutBadge(engin.statut)}`}>
+                    {engin.statut === "recherche" ? "En recherche" : engin.statut === "retrouve" ? "Retrouvé" : "Clos"}
+                  </span>
+                  <div className={`absolute top-4 left-4 px-2.5 py-1.5 rounded-xl text-xs font-bold ${getTypeBgColor(engin.type_engin)}`}>
+                    {getTypeLabel(engin.type_engin)}
+                  </div>
+                </div>
+                <div className="p-5">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">{engin.marque} {engin.modele}</h3>
+                  <p className="text-xl font-bold text-orange-600 dark:text-orange-400 font-mono mb-3">{engin.plaque_immatriculation}</p>
+                  <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                    {engin.couleur && <p><span className="font-semibold">Couleur:</span> {engin.couleur}</p>}
+                    {engin.date_vol && <p><span className="font-semibold">Volé le:</span> {new Date(engin.date_vol).toLocaleDateString("fr-FR")}</p>}
+                  </div>
+                  {engin.statut === "recherche" && (
+                    <div className="mt-4 flex gap-2">
+                      <button onClick={() => handleUpdateStatut(engin.id, "retrouve")}
+                        className="flex-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors">
+                        ✓ Retrouvé
+                      </button>
+                      <button onClick={() => handleUpdateStatut(engin.id, "clos")}
+                        className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs font-semibold">
+                        Clore
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </>
   );
 };

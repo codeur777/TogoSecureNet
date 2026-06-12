@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/alerts_provider.dart';
+import '../../../../core/models/alert_model.dart';
 
 class AlertsPage extends ConsumerStatefulWidget {
   const AlertsPage({super.key});
@@ -27,13 +28,13 @@ class _AlertsPageState extends ConsumerState<AlertsPage>
     super.dispose();
   }
 
-  Color _getGravityColor(String gravity) {
-    switch (gravity) {
-      case 'tres_grave':
+  Color _getGravityColor(AlertSeverity severity) {
+    switch (severity) {
+      case AlertSeverity.verySerious:
         return AppColors.alertDanger;
-      case 'grave':
+      case AlertSeverity.serious:
         return AppColors.alertWarning;
-      default:
+      case AlertSeverity.notSerious:
         return AppColors.primary;
     }
   }
@@ -91,7 +92,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage>
           children: [
             // Non lues
             _buildAlertsList(
-              alertsState.alerts.where((a) => !a.estLue).toList(),
+              alertsState.alerts.where((a) => a.status == AlertStatus.pending).toList(),
               alertsState.isLoading,
             ),
             // Toutes
@@ -105,7 +106,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage>
     );
   }
 
-  Widget _buildAlertsList(List alerts, bool isLoading) {
+  Widget _buildAlertsList(List<AlertModel> alerts, bool isLoading) {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -138,7 +139,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage>
       itemCount: alerts.length,
       itemBuilder: (context, index) {
         final alert = alerts[index];
-        final gravityColor = _getGravityColor(alert.niveauGravite);
+        final gravityColor = _getGravityColor(alert.severity);
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -146,8 +147,8 @@ class _AlertsPageState extends ConsumerState<AlertsPage>
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: alert.estLue ? Colors.grey[300]! : gravityColor,
-              width: alert.estLue ? 1 : 2,
+              color: alert.status != AlertStatus.pending ? Colors.grey[300]! : gravityColor,
+              width: alert.status != AlertStatus.pending ? 1 : 2,
             ),
             boxShadow: [
               BoxShadow(
@@ -177,7 +178,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
-                        alert.niveauGravite == 'tres_grave'
+                        alert.severity == AlertSeverity.verySerious
                             ? Icons.warning_rounded
                             : Icons.info_rounded,
                         color: gravityColor,
@@ -194,15 +195,15 @@ class _AlertsPageState extends ConsumerState<AlertsPage>
                           Row(
                             children: [
                               Expanded(
-                                child: Text(
-                                  alert.typeDetection ?? 'Alerte',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                                  child: Text(
+                                    alert.cameraName ?? 'Détection intelligente',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              if (!alert.estLue)
+                                if (alert.status == AlertStatus.pending)
                                 Container(
                                   width: 10,
                                   height: 10,
@@ -215,7 +216,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage>
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            alert.message ?? 'Nouvelle détection',
+                            alert.description ?? 'Alerte de sécurité',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[700],
@@ -233,7 +234,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage>
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                _formatDate(alert.dateEmission),
+                                _formatDate(alert.detectionTime),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey[500],
@@ -256,11 +257,8 @@ class _AlertsPageState extends ConsumerState<AlertsPage>
     );
   }
 
-  String _formatDate(String? dateStr) {
-    if (dateStr == null) return '';
-    
+  String _formatDate(DateTime date) {
     try {
-      final date = DateTime.parse(dateStr);
       final now = DateTime.now();
       final diff = now.difference(date);
 

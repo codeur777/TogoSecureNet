@@ -35,13 +35,15 @@ import CitoyenEnginsVoles from "./pages/Citoyen/EnginsVoles";
 import CitoyenNotifications from "./pages/Citoyen/Notifications";
 
 // Signalements publics
-import ReportPerson from "./pages/ReportPerson";
-import ReportVehicle from "./pages/ReportVehicle";
+import ReportPersonPage from "./pages/Report/ReportPersonPage";
+import ReportVehiclePage from "./pages/Report/ReportVehiclePage";
+import GestionSignalements from "./pages/Signalements/GestionSignalements";
 
 // Auth & Fallback
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import ForgotPassword from "./pages/AuthPages/ForgotPassword";
+import ForceChangePassword from "./pages/ForceChangePassword";
 import NotFound from "./pages/OtherPage/NotFound";
 
 // Pages légales
@@ -64,13 +66,14 @@ export default function App() {
             <Route path="/terms-of-service" element={<TermsOfService />} />
             
             {/* Pages de signalement publiques */}
-            <Route path="/report/person" element={<ReportPerson />} />
-            <Route path="/report/vehicle" element={<ReportVehicle />} />
+            <Route path="/report/person" element={<ReportPersonPage />} />
+            <Route path="/report/vehicle" element={<ReportVehiclePage />} />
 
             {/* Auth Layout */}
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/force-change-password" element={<ForceChangePassword />} />
 
             {/* Dashboard Admin/Superviseur (protégé) */}
             <Route element={
@@ -85,6 +88,7 @@ export default function App() {
               <Route path="/alertes" element={<Alertes />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/signalements" element={<Signalements />} />
+              <Route path="/gestion-signalements" element={<GestionSignalements />} />
               <Route path="/detections" element={<Detections />} />
               <Route path="/portrait-robot" element={<PortraitRobot />} />
               <Route path="/statistiques" element={<Statistiques />} />

@@ -6,9 +6,8 @@ import Input from "../components/form/input/InputField";
 import Button from "../components/ui/button/Button";
 import toast from "react-hot-toast";
 import { useTheme } from "../context/ThemeContext";
-import { Link } from "react-router";
-import { authService } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router";
 import api from "../services/api";
 
 export default function Settings() {

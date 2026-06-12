@@ -55,55 +55,41 @@ export default function Home() {
 
   const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
   const [cameras, setCameras] = useState<Camera[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Charger les données initiales depuis le backend
   const fetchData = async () => {
     try {
-      setLoading(true);
       const [statsRes, alertsRes, camsRes] = await Promise.all([
         api.get("/api/v1/stats").catch(() => ({ data: null })),
         api.get("/api/v1/alerts").catch(() => ({ data: [] })),
         api.get("/api/v1/cameras").catch(() => ({ data: [] })),
       ]);
 
+      const alerts = Array.isArray(alertsRes.data) ? alertsRes.data : alertsRes.data?.results ?? [];
+      const cams = Array.isArray(camsRes.data) ? camsRes.data : camsRes.data?.results ?? [];
+
       if (statsRes.data) {
         setStats(statsRes.data);
       } else {
-        // Fallback si la route stats n'existe pas encore ou échoue
+        // Calcul dynamique depuis les données récupérées
         const todayStr = new Date().toISOString().split("T")[0];
-        const todayAlerts = alertsRes.data.filter((a: Alert) => a.created_at.startsWith(todayStr));
+        const todayAlerts = alerts.filter((a: Alert) => a.created_at.startsWith(todayStr));
         const criticalToday = todayAlerts.filter((a: Alert) => a.gravity_level === "critical");
         setStats({
-          total_cameras: camsRes.data.length || 3,
-          active_cameras: camsRes.data.filter((c: Camera) => c.status === "active").length || 3,
-          total_alerts_today: todayAlerts.length || 3,
-          critical_alerts_today: criticalToday.length || 1,
+          total_cameras: cams.length,
+          active_cameras: cams.filter((c: Camera) => c.status === "active").length,
+          total_alerts_today: todayAlerts.length,
+          critical_alerts_today: criticalToday.length,
         });
       }
 
-      setRecentAlerts(alertsRes.data.slice(0, 5));
-      setCameras(camsRes.data);
+      setRecentAlerts(alerts.slice(0, 5));
+      setCameras(cams);
     } catch (error) {
       console.error("Erreur de chargement des données:", error);
-      // Données mockées en cas d'erreur
-      setRecentAlerts([
-        { id: 1, person_id: 1, person_name: "Koffi Mensah", camera_id: 1, camera_name: "LOM-MARCHE-01", gravity_level: "high", confidence: 0.92, created_at: new Date().toISOString() },
-        { id: 2, person_id: 2, person_name: "Abla Ayayi", camera_id: 2, camera_name: "LOM-AERO-04", gravity_level: "critical", confidence: 0.97, created_at: new Date(Date.now() - 3600000).toISOString() },
-      ]);
-      setCameras([
-        { id: 1, name: "LOM-MARCHE-01", address: "Grand Marché, Lomé", location_lat: 6.1319, location_lng: 1.2227, status: "active" },
-        { id: 2, name: "LOM-AERO-04", address: "Aéroport Débarquement", location_lat: 6.1455, location_lng: 1.2105, status: "active" },
-        { id: 3, name: "LOM-PORT-02", address: "Port Autonome Quai 3", location_lat: 6.1250, location_lng: 1.2350, status: "active" },
-      ]);
-      setStats({
-        total_cameras: 3,
-        active_cameras: 3,
-        total_alerts_today: 2,
-        critical_alerts_today: 1,
-      });
-    } finally {
-      setLoading(false);
+      // En cas d'erreur totale, laisser les listes vides et afficher les zéros
+      setRecentAlerts([]);
+      setCameras([]);
     }
   };
 

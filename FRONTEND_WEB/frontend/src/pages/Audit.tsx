@@ -283,8 +283,8 @@ const Audit = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${getModuleBadge(log.module)}`}>
-                        {log.module.charAt(0).toUpperCase() + log.module.slice(1)}
+                      <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${getModuleBadge(log.module || 'systeme')}`}>
+                        {log.module ? log.module.charAt(0).toUpperCase() + log.module.slice(1) : 'Système'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -299,8 +299,8 @@ const Audit = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         {getStatutIcon(log.statut)}
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatutBadge(log.statut)}`}>
-                          {log.statut.charAt(0).toUpperCase() + log.statut.slice(1)}
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatutBadge(log.statut || 'succes')}`}>
+                          {log.statut ? log.statut.charAt(0).toUpperCase() + log.statut.slice(1) : 'Succès'}
                         </span>
                       </div>
                     </td>

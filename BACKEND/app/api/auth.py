@@ -153,12 +153,21 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(deps.get_d
     if not user.is_active:
         raise HTTPException(403, "Compte désactivé")
 
-    if user.two_factor_enabled:
+    # Forcer 2FA si compte non vérifié (créé par admin)
+    requires_2fa = user.two_factor_enabled or not user.is_verified
+    
+    if requires_2fa:
         otp = store_otp(user.email, purpose="login")
+        print(f"\n{'='*50}\n🔐 OTP LOGIN pour {user.email}: {otp}\n{'='*50}\n")
         email_sent = send_otp_email(user.email, otp, purpose="login")
         if not email_sent:
             raise HTTPException(500, "Erreur lors de l'envoi de l'email OTP")
-        return {"requires_otp": True, "message": "Code OTP envoyé par email"}
+        return {
+            "requires_otp": True, 
+            "message": "Code OTP envoyé par email",
+            "must_change_password": user.must_change_password if hasattr(user, 'must_change_password') else False,
+            "is_verified": user.is_verified
+        }
 
     # Pas de 2FA → tokens directs
     access = security.create_access_token(user.email, extra={"role": user.role})
@@ -167,7 +176,15 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(deps.get_d
     user.last_login = datetime.utcnow()
     db.commit()
     log_action(db, user.id, "connexion", request)
-    return {"access_token": access, "refresh_token": refresh, "token_type": "bearer", "role": user.role}
+    
+    return {
+        "access_token": access, 
+        "refresh_token": refresh, 
+        "token_type": "bearer", 
+        "role": user.role,
+        "must_change_password": user.must_change_password if hasattr(user, 'must_change_password') else False,
+        "is_verified": user.is_verified
+    }
 
 
 @router.post("/verify-otp")
@@ -183,7 +200,15 @@ def verify_otp_route(data: OTPVerifyRequest, request: Request, db: Session = Dep
     user.last_login = datetime.utcnow()
     db.commit()
     log_action(db, user.id, "connexion_otp", request)
-    return {"access_token": access, "refresh_token": refresh, "token_type": "bearer", "role": user.role}
+    
+    return {
+        "access_token": access, 
+        "refresh_token": refresh, 
+        "token_type": "bearer", 
+        "role": user.role,
+        "must_change_password": user.must_change_password if hasattr(user, 'must_change_password') else False,
+        "is_verified": user.is_verified
+    }
 
 
 @router.post("/refresh")
@@ -224,6 +249,8 @@ def me(current_user: User = Depends(deps.get_current_user)):
         "phone": current_user.phone,
         "role": current_user.role,
         "is_active": current_user.is_active,
+        "is_verified": current_user.is_verified,
+        "must_change_password": current_user.must_change_password if hasattr(current_user, 'must_change_password') else False,
         "two_factor_enabled": current_user.two_factor_enabled,
         "last_login": current_user.last_login,
     }
@@ -238,6 +265,7 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(deps.get_
         # Sécurité : ne pas révéler si l'email existe
         return {"message": "Si cet email existe, un OTP a été envoyé"}
     otp = store_otp(data.email, purpose="reset")
+    print(f"\n{'='*50}\n🔑 OTP RESET pour {data.email}: {otp}\n{'='*50}\n")
     send_otp_email(data.email, otp, purpose="reset")
     return {"message": "OTP envoyé"}
 
@@ -282,7 +310,17 @@ def change_password(
         raise HTTPException(400, "Mot de passe actuel incorrect")
     if len(data.new_password) < 6:
         raise HTTPException(400, "Mot de passe trop court (min. 6 caractères)")
+    
     current_user.hashed_password = security.get_password_hash(data.new_password)
+    
+    # Désactiver must_change_password, activer is_verified et désactiver 2FA après le premier changement (compte créé par admin)
+    if hasattr(current_user, 'must_change_password') and current_user.must_change_password:
+        current_user.must_change_password = False
+        current_user.is_verified = True
+        # Désactiver 2FA automatiquement sauf pour admin
+        if current_user.role != "admin":
+            current_user.two_factor_enabled = False
+    
     db.commit()
     log_action(db, current_user.id, "changement_mot_de_passe", request)
     return {"message": "Mot de passe modifié avec succès"}

@@ -18,6 +18,7 @@ class User(Base):
     status = Column(String, default="actif")  # actif, inactif, suspendu
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+    must_change_password = Column(Boolean, default=False)  # True si créé par admin
     two_factor_enabled = Column(Boolean, default=False)  # activé selon le rôle au seed
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

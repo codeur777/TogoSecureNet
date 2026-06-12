@@ -26,11 +26,19 @@ def get_users(
         )
     
     users = db.query(User).all()
+    
+    # Mettre à jour full_name pour les utilisateurs qui n'en ont pas
+    for user in users:
+        if not user.full_name and (user.first_name or user.last_name):
+            user.full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    
+    db.commit()
+    
     return users
 
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(
-    user_id: int,
+    user_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -77,14 +85,20 @@ def create_user(
     
     # Créer l'utilisateur
     hashed_password = get_password_hash(user_data.password)
+    full_name = f"{user_data.first_name} {user_data.last_name}".strip()
+    
     new_user = User(
         email=user_data.email,
         hashed_password=hashed_password,
         first_name=user_data.first_name,
         last_name=user_data.last_name,
+        full_name=full_name,
         phone=user_data.phone,
         role=user_data.role,
-        status="actif"
+        status="actif",
+        is_verified=False,  # Email non vérifié
+        must_change_password=True,  # Doit changer le mot de passe
+        two_factor_enabled=True  # 2FA obligatoire pour comptes non vérifiés
     )
     
     db.add(new_user)
@@ -95,7 +109,7 @@ def create_user(
 
 @router.patch("/{user_id}", response_model=UserResponse)
 def update_user(
-    user_id: int,
+    user_id: str,
     user_data: UserUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -124,6 +138,10 @@ def update_user(
         else:
             setattr(user, field, value)
     
+    # Regénérer full_name si first_name ou last_name sont modifiés
+    if 'first_name' in update_data or 'last_name' in update_data:
+        user.full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    
     db.commit()
     db.refresh(user)
     
@@ -131,7 +149,7 @@ def update_user(
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
-    user_id: int,
+    user_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

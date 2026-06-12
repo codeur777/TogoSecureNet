@@ -29,7 +29,7 @@ def read_cameras(
     return cameras
 
 @router.get("/{camera_id}", response_model=Camera)
-def read_camera(camera_id: int, db: Session = Depends(deps.get_db)):
+def read_camera(camera_id: str, db: Session = Depends(deps.get_db)):
     db_camera = db.query(CameraModel).filter(CameraModel.id == camera_id).first()
     if not db_camera:
         raise HTTPException(status_code=404, detail="Camera not found")
@@ -37,7 +37,7 @@ def read_camera(camera_id: int, db: Session = Depends(deps.get_db)):
 
 @router.patch("/{camera_id}", response_model=Camera)
 def update_camera(
-    camera_id: int,
+    camera_id: str,
     camera_in: CameraUpdate,
     db: Session = Depends(deps.get_db)
 ):

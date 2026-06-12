@@ -1,13 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/alert_model.dart';
+import '../network/dio_client.dart';
 import '../../features/alerts/data/alerts_service.dart';
 
 // Provider pour AlertsService
 final alertsServiceProvider = Provider<AlertsService>((ref) {
-  return AlertsService();
+  final dio = ref.watch(dioProvider);
+  return AlertsService(dio);
 });
 
-// StateNotifier pour gérer les alertes
+// État des alertes
 class AlertsState {
   final List<AlertModel> alerts;
   final AlertModel? selectedAlert;
@@ -40,27 +42,29 @@ class AlertsState {
   }
 }
 
-class AlertsNotifier extends StateNotifier<AlertsState> {
-  final AlertsService _alertsService;
+// Riverpod 3.x : Notifier<T>
+class AlertsNotifier extends Notifier<AlertsState> {
+  late AlertsService _alertsService;
 
-  AlertsNotifier(this._alertsService) : super(AlertsState());
+  @override
+  AlertsState build() {
+    _alertsService = ref.watch(alertsServiceProvider);
+    return AlertsState();
+  }
 
-  Future<void> loadAlerts({bool? estLue}) async {
+  Future<void> loadAlerts({AlertStatus? status}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final alerts = await _alertsService.getAlerts(estLue: estLue);
+      final alerts = await _alertsService.getAlerts(status: status);
       final unreadCount = await _alertsService.getUnreadCount();
-      
+
       state = state.copyWith(
         alerts: alerts,
         unreadCount: unreadCount,
         isLoading: false,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -68,42 +72,25 @@ class AlertsNotifier extends StateNotifier<AlertsState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final alert = await _alertsService.getAlertById(alertId);
-      state = state.copyWith(
-        selectedAlert: alert,
-        isLoading: false,
-      );
+      state = state.copyWith(selectedAlert: alert, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> markAsRead(String alertId) async {
     try {
       await _alertsService.markAsRead(alertId);
-      
-      // Mettre à jour localement
+
       final updatedAlerts = state.alerts.map((alert) {
         if (alert.id == alertId) {
-          return alert.copyWith(estLue: true);
+          return alert.copyWith(status: AlertStatus.accepted);
         }
         return alert;
       }).toList();
-      
+
       final newUnreadCount = state.unreadCount > 0 ? state.unreadCount - 1 : 0;
-      
-      state = state.copyWith(
-        alerts: updatedAlerts,
-        unreadCount: newUnreadCount,
-      );
-      
-      if (state.selectedAlert?.id == alertId) {
-        state = state.copyWith(
-          selectedAlert: state.selectedAlert!.copyWith(estLue: true),
-        );
-      }
+      state = state.copyWith(alerts: updatedAlerts, unreadCount: newUnreadCount);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -118,36 +105,37 @@ class AlertsNotifier extends StateNotifier<AlertsState> {
     }
   }
 
-  List<AlertModel> get unreadAlerts {
-    return state.alerts.where((alert) => !alert.estLue).toList();
-  }
-
-  List<AlertModel> get readAlerts {
-    return state.alerts.where((alert) => alert.estLue).toList();
+  List<AlertModel> get pendingAlerts {
+    return state.alerts.where((a) => a.status == AlertStatus.pending).toList();
   }
 
   List<AlertModel> get criticalAlerts {
     return state.alerts
-        .where((alert) => alert.niveauGravite == 'tres_grave' && !alert.estLue)
+        .where((a) =>
+            a.severity == AlertSeverity.verySerious &&
+            a.status == AlertStatus.pending)
         .toList();
   }
 }
 
-// Provider principal pour les alertes
-final alertsProvider = StateNotifierProvider<AlertsNotifier, AlertsState>((ref) {
-  final alertsService = ref.watch(alertsServiceProvider);
-  return AlertsNotifier(alertsService);
-});
+// Riverpod 3.x : NotifierProvider
+final alertsProvider = NotifierProvider<AlertsNotifier, AlertsState>(
+  AlertsNotifier.new,
+);
 
-// Providers utilitaires
-final unreadAlertsProvider = Provider<List<AlertModel>>((ref) {
+// Providers dérivés
+final pendingAlertsProvider = Provider<List<AlertModel>>((ref) {
   final alertsState = ref.watch(alertsProvider);
-  return alertsState.alerts.where((alert) => !alert.estLue).toList();
+  return alertsState.alerts
+      .where((alert) => alert.status == AlertStatus.pending)
+      .toList();
 });
 
 final criticalAlertsProvider = Provider<List<AlertModel>>((ref) {
   final alertsState = ref.watch(alertsProvider);
   return alertsState.alerts
-      .where((alert) => alert.niveauGravite == 'tres_grave' && !alert.estLue)
+      .where((alert) =>
+          alert.severity == AlertSeverity.verySerious &&
+          alert.status == AlertStatus.pending)
       .toList();
 });

@@ -28,6 +28,11 @@ const ProtectedRoute = ({
     return <Navigate to="/signin" replace />;
   }
 
+  // Si l'utilisateur doit changer son mot de passe
+  if (isAuthenticated && user?.must_change_password) {
+    return <Navigate to="/force-change-password" replace />;
+  }
+
   // Si des rôles spécifiques sont requis
   if (allowedRoles && user) {
     if (!allowedRoles.includes(user.role)) {

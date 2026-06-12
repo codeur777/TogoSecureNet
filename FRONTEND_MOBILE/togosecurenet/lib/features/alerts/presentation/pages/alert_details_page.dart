@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/alerts_provider.dart';
 import '../../../../core/providers/intervention_provider.dart';
+import '../../../../core/models/alert_model.dart';
 import '../../../../core/models/intervention_model.dart';
 import '../../../../core/services/navigation_service.dart';
 import '../../../../shared/widgets/map_widget.dart';
@@ -29,24 +30,24 @@ class _AlertDetailsPageState extends ConsumerState<AlertDetailsPage> {
     });
   }
 
-  Color _getGravityColor(String gravity) {
-    switch (gravity) {
-      case 'tres_grave':
+  Color _getGravityColor(AlertSeverity severity) {
+    switch (severity) {
+      case AlertSeverity.verySerious:
         return AppColors.alertDanger;
-      case 'grave':
+      case AlertSeverity.serious:
         return AppColors.alertWarning;
-      default:
+      case AlertSeverity.notSerious:
         return AppColors.primary;
     }
   }
 
-  String _getGravityText(String gravity) {
-    switch (gravity) {
-      case 'tres_grave':
+  String _getGravityText(AlertSeverity severity) {
+    switch (severity) {
+      case AlertSeverity.verySerious:
         return 'Très Grave';
-      case 'grave':
+      case AlertSeverity.serious:
         return 'Grave';
-      default:
+      case AlertSeverity.notSerious:
         return 'Modéré';
     }
   }
@@ -66,7 +67,7 @@ class _AlertDetailsPageState extends ConsumerState<AlertDetailsPage> {
       );
     }
 
-    final gravityColor = _getGravityColor(alert.niveauGravite);
+    final gravityColor = _getGravityColor(alert.severity);
     final hasActiveIntervention = interventionState.currentIntervention != null;
     final isThisAlertActive = interventionState.currentIntervention?.alertId == alert.id;
 
@@ -94,7 +95,7 @@ class _AlertDetailsPageState extends ConsumerState<AlertDetailsPage> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Icon(
-                      alert.niveauGravite == 'tres_grave'
+                      alert.severity == AlertSeverity.verySerious
                           ? Icons.warning_rounded
                           : Icons.info_rounded,
                       color: gravityColor,
@@ -109,7 +110,7 @@ class _AlertDetailsPageState extends ConsumerState<AlertDetailsPage> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      _getGravityText(alert.niveauGravite),
+                      _getGravityText(alert.severity),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -131,7 +132,7 @@ class _AlertDetailsPageState extends ConsumerState<AlertDetailsPage> {
                   _InfoCard(
                     icon: Icons.category_rounded,
                     title: 'Type de détection',
-                    content: alert.typeDetection ?? 'Non spécifié',
+                    content: alert.cameraName ?? 'Non spécifié',
                   ),
                   
                   const SizedBox(height: 16),
@@ -140,19 +141,18 @@ class _AlertDetailsPageState extends ConsumerState<AlertDetailsPage> {
                   _InfoCard(
                     icon: Icons.message_rounded,
                     title: 'Message',
-                    content: alert.message ?? 'Aucun message',
+                    content: alert.description ?? 'Aucun message',
                   ),
                   
                   const SizedBox(height: 16),
                   
                   // Carte Google Maps
-                  if (alert.localisation != null)
-                    MapWidget(
-                      targetLatitude: 6.1256, // TODO: Extraire lat/lng de alert.localisation
-                      targetLongitude: 1.2219,
-                      targetTitle: 'Point de détection',
-                      height: 250,
-                    ),
+                  MapWidget(
+                    targetLatitude: alert.latitude,
+                    targetLongitude: alert.longitude,
+                    targetTitle: 'Point de détection',
+                    height: 250,
+                  ),
                   
                   const SizedBox(height: 16),
                   
@@ -160,7 +160,7 @@ class _AlertDetailsPageState extends ConsumerState<AlertDetailsPage> {
                   _InfoCard(
                     icon: Icons.location_on_rounded,
                     title: 'Localisation',
-                    content: alert.localisation ?? 'Position inconnue',
+                    content: 'Lat: ${alert.latitude.toStringAsFixed(4)}, Lng: ${alert.longitude.toStringAsFixed(4)}',
                   ),
                   
                   const SizedBox(height: 16),
@@ -169,7 +169,7 @@ class _AlertDetailsPageState extends ConsumerState<AlertDetailsPage> {
                   _InfoCard(
                     icon: Icons.access_time_rounded,
                     title: 'Date d\'émission',
-                    content: _formatDateTime(alert.dateEmission),
+                    content: _formatDateTime(alert.detectionTime),
                   ),
                   
                   const SizedBox(height: 32),
@@ -213,7 +213,7 @@ class _AlertDetailsPageState extends ConsumerState<AlertDetailsPage> {
     );
   }
 
-  Widget _buildAcceptButton(alert) {
+  Widget _buildAcceptButton(AlertModel alert) {
     return SizedBox(
       width: double.infinity,
       height: 56,
@@ -361,14 +361,11 @@ class _AlertDetailsPageState extends ConsumerState<AlertDetailsPage> {
     );
   }
 
-  String _formatDateTime(String? dateStr) {
-    if (dateStr == null) return 'Non spécifié';
-    
+  String _formatDateTime(DateTime date) {
     try {
-      final date = DateTime.parse(dateStr);
       return '${date.day}/${date.month}/${date.year} à ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
     } catch (e) {
-      return dateStr;
+      return date.toString();
     }
   }
 }

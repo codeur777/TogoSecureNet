@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/models/intervention_model.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/intervention_provider.dart';
 
@@ -73,7 +74,7 @@ class ProfilePage extends ConsumerWidget {
                     radius: 60,
                     backgroundColor: Colors.white,
                     child: Text(
-                      '${user.firstName?[0] ?? ''}${user.lastName?[0] ?? ''}',
+                      '${user.firstName[0]}${user.lastName[0]}',
                       style: const TextStyle(
                         fontSize: 36,
                         fontWeight: FontWeight.bold,
@@ -83,7 +84,7 @@ class ProfilePage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '${user.firstName ?? ''} ${user.lastName ?? ''}',
+                    '${user.firstName} ${user.lastName}',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -159,7 +160,7 @@ class ProfilePage extends ConsumerWidget {
                   _InfoTile(
                     icon: Icons.email_rounded,
                     label: 'Email',
-                    value: user.email ?? 'Non renseigné',
+                    value: user.email,
                   ),
                   
                   _InfoTile(
@@ -177,7 +178,7 @@ class ProfilePage extends ConsumerWidget {
                   _InfoTile(
                     icon: Icons.calendar_today_rounded,
                     label: 'Dernière connexion',
-                    value: _formatDateTime(user.lastLogin),
+                    value: 'Non disponible',
                   ),
                 ],
               ),
@@ -186,17 +187,6 @@ class ProfilePage extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  String _formatDateTime(String? dateStr) {
-    if (dateStr == null) return 'Jamais';
-    
-    try {
-      final date = DateTime.parse(dateStr);
-      return '${date.day}/${date.month}/${date.year} à ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return 'Non disponible';
-    }
   }
 }
 

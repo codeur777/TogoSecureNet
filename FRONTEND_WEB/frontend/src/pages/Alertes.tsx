@@ -3,15 +3,15 @@ import PageMeta from "../components/common/PageMeta";
 import api from "../services/api";
 
 type Alert = {
-  id: number;
-  person_id: number;
-  camera_id: number;
-  gravity_level: string;
-  confidence: number;
-  created_at: string;
+  id: string;
+  detection_id: string;
+  niveau_gravite: string;
+  type_detection: string;
+  message: string;
+  est_lue: boolean;
+  date_emission: string;
   person_name?: string;
   camera_name?: string;
-  status: "unread" | "read" | "resolved";
 };
 
 export default function Alertes() {
@@ -22,16 +22,15 @@ export default function Alertes() {
   const fetchAlerts = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/api/v1/alerts");
-      setAlerts(res.data);
-    } catch (e) {
+      const res = await api.get("/api/v1/alertes/");
+      setAlerts(Array.isArray(res.data) ? res.data : res.data.results ?? []);
+    } catch (e: any) {
       console.error(e);
-      // Mock data if backend fails
-      setAlerts([
-        { id: 1, person_id: 1, person_name: "Koffi Mensah", camera_id: 1, camera_name: "LOM-MARCHE-01", gravity_level: "high", confidence: 0.92, created_at: new Date().toISOString(), status: "unread" },
-        { id: 2, person_id: 2, person_name: "Abla Ayayi", camera_id: 2, camera_name: "LOM-AERO-04", gravity_level: "critical", confidence: 0.97, created_at: new Date(Date.now() - 3600000).toISOString(), status: "unread" },
-        { id: 3, person_id: 1, person_name: "Koffi Mensah", camera_id: 3, camera_name: "LOM-PORT-02", gravity_level: "warning", confidence: 0.84, created_at: new Date(Date.now() - 7200000).toISOString(), status: "resolved" },
-      ]);
+      const msg = e?.response?.status === 401
+        ? "Session expirée, veuillez vous reconnecter."
+        : "Impossible de charger les alertes. Vérifiez la connexion au serveur.";
+      import("react-hot-toast").then(({ default: toast }) => toast.error(msg));
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -41,34 +40,36 @@ export default function Alertes() {
     fetchAlerts();
   }, []);
 
-  const handleUpdateStatus = async (id: number, status: "read" | "resolved") => {
+  const handleUpdateStatus = async (id: string) => {
     try {
-      await api.patch(`/api/v1/alerts/${id}`, { status });
-      setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
-    } catch (e) {
+      await api.patch(`/api/v1/alertes/${id}/lire`);
+      setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, est_lue: true } : a)));
+      import("react-hot-toast").then(({ default: toast }) =>
+        toast.success("Alerte marquée comme lue.")
+      );
+    } catch (e: any) {
       console.error(e);
-      // Update local state anyway for offline/mock experience
-      setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+      import("react-hot-toast").then(({ default: toast }) => toast.error("Erreur lors de la mise à jour."));
     }
   };
 
   const getGravityColor = (level: string) => {
-    if (level === "critical") return "text-error-600 bg-error-50 dark:bg-error-500/15 dark:text-error-400 border border-error-100 dark:border-error-500/20";
-    if (level === "high") return "text-orange-600 bg-orange-50 dark:bg-orange-500/15 dark:text-orange-400 border border-orange-100 dark:border-orange-500/20";
+    if (level === "tres_grave") return "text-error-600 bg-error-50 dark:bg-error-500/15 dark:text-error-400 border border-error-100 dark:border-error-500/20";
+    if (level === "grave") return "text-orange-600 bg-orange-50 dark:bg-orange-500/15 dark:text-orange-400 border border-orange-100 dark:border-orange-500/20";
     return "text-warning-600 bg-warning-50 dark:bg-warning-500/15 dark:text-warning-400 border border-warning-100 dark:border-warning-500/20";
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === "unread") return "bg-red-100 text-red-800 dark:bg-red-500/10 dark:text-red-400";
-    if (status === "read") return "bg-blue-100 text-blue-800 dark:bg-blue-500/10 dark:text-blue-400";
-    return "bg-gray-100 text-gray-800 dark:bg-gray-500/10 dark:text-gray-400";
+  const getStatusBadge = (est_lue: boolean) => {
+    return est_lue 
+      ? "bg-gray-100 text-gray-800 dark:bg-gray-500/10 dark:text-gray-400"
+      : "bg-red-100 text-red-800 dark:bg-red-500/10 dark:text-red-400";
   };
 
   const filteredAlerts = alerts.filter((a) => {
     if (filter === "all") return true;
-    if (filter === "critical") return a.gravity_level === "critical";
-    if (filter === "high") return a.gravity_level === "high";
-    if (filter === "resolved") return a.status === "resolved";
+    if (filter === "critical") return a.niveau_gravite === "tres_grave";
+    if (filter === "high") return a.niveau_gravite === "grave";
+    if (filter === "resolved") return a.est_lue;
     return true;
   });
 
@@ -172,51 +173,44 @@ export default function Alertes() {
                     <tr key={alert.id} className="hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getGravityColor(alert.gravity_level)}`}>
-                            {alert.gravity_level}
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getGravityColor(alert.niveau_gravite)}`}>
+                            {alert.niveau_gravite}
                           </span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${getStatusBadge(alert.status)}`}>
-                            {alert.status === "unread" ? "Non lue" : alert.status === "read" ? "Lue" : "Résolue"}
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${getStatusBadge(alert.est_lue)}`}>
+                            {alert.est_lue ? "Lue" : "Non lue"}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 font-semibold text-gray-800 dark:text-white/90">
-                        {alert.person_name || `Individu #${alert.person_id}`}
+                        {alert.type_detection}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
                           <span className="font-medium text-gray-700 dark:text-gray-300">
-                            {alert.camera_name || `Caméra #${alert.camera_id}`}
+                            {alert.camera_name || "Caméra inconnue"}
                           </span>
+                          <span className="text-xs text-gray-500">{alert.message}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 font-medium text-blue-600 dark:text-blue-400">
-                        {(alert.confidence * 100).toFixed(1)}%
+                        —
                       </td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
-                        {new Date(alert.created_at).toLocaleDateString("fr-FR")} à{" "}
-                        {new Date(alert.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        {new Date(alert.date_emission).toLocaleDateString("fr-FR")} à{" "}
+                        {new Date(alert.date_emission).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {alert.status === "unread" && (
+                          {!alert.est_lue && (
                             <button
-                              onClick={() => handleUpdateStatus(alert.id, "read")}
+                              onClick={() => handleUpdateStatus(alert.id)}
                               className="px-2.5 py-1 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 rounded-lg font-medium transition-colors"
                             >
                               Marquer lue
                             </button>
                           )}
-                          {alert.status !== "resolved" && (
-                            <button
-                              onClick={() => handleUpdateStatus(alert.id, "resolved")}
-                              className="px-2.5 py-1 text-xs bg-success-50 text-success-600 hover:bg-success-100 dark:bg-success-500/10 dark:text-success-400 rounded-lg font-medium transition-colors"
-                            >
-                              Résoudre
-                            </button>
-                          )}
-                          {alert.status === "resolved" && (
-                            <span className="text-xs text-gray-400 font-medium">Traité</span>
+                          {alert.est_lue && (
+                            <span className="text-xs text-gray-400 font-medium">Lue</span>
                           )}
                         </div>
                       </td>

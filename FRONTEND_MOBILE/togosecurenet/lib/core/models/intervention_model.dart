@@ -17,23 +17,27 @@ enum InterventionStatus {
   completed,
   @JsonValue('false_alarm')
   falseAlarm,
+  @JsonValue('cancelled')
+  cancelled,
 }
 
 @freezed
-class InterventionModel with _$InterventionModel {
+abstract class InterventionModel with _$InterventionModel {
   const factory InterventionModel({
     required String id,
     @JsonKey(name: 'alert_id') required String alertId,
-    required AlertModel alert,
+    required AlertModel? alert,
     @JsonKey(name: 'agent_id') required String agentId,
     required InterventionStatus status,
+    @JsonKey(name: 'start_time') DateTime? startTime,
+    @JsonKey(name: 'end_time') DateTime? endTime,
     @JsonKey(name: 'started_at') DateTime? startedAt,
     @JsonKey(name: 'arrived_at') DateTime? arrivedAt,
     @JsonKey(name: 'completed_at') DateTime? completedAt,
     @JsonKey(name: 'response_time') int? responseTime, // en secondes
     String? notes,
     @JsonKey(name: 'person_found') @Default(false) bool personFound,
-    @JsonKey(name: 'false_alarm') @Default(false) bool falseAlarm,
+    @JsonKey(name: 'false_alarm') @Default(false) bool isFalseAlarm,
   }) = _InterventionModel;
 
   factory InterventionModel.fromJson(Map<String, dynamic> json) =>
@@ -55,6 +59,8 @@ extension InterventionStatusExtension on InterventionStatus {
         return 'Terminée';
       case InterventionStatus.falseAlarm:
         return 'Fausse alerte';
+      case InterventionStatus.cancelled:
+        return 'Annulée';
     }
   }
 
@@ -72,6 +78,8 @@ extension InterventionStatusExtension on InterventionStatus {
         return 0xFF10B981; // Vert foncé
       case InterventionStatus.falseAlarm:
         return 0xFFDC2626; // Rouge
+      case InterventionStatus.cancelled:
+        return 0xFF6B7280; // Gris
     }
   }
 }

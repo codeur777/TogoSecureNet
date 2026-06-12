@@ -2,21 +2,30 @@ from pydantic import BaseModel
 from typing import Optional
 
 class CameraBase(BaseModel):
-    name: str
+    nom: str
+    type: Optional[str] = "ip"
+    description: Optional[str] = None
+    localisation: Optional[str] = None
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
-    address: Optional[str] = None
-    rtsp_url: Optional[str] = None
-    status: str = "active"
+    url_flux: Optional[str] = None
+    est_active: bool = True
 
 class CameraCreate(CameraBase):
     pass
 
-class CameraUpdate(CameraBase):
-    name: Optional[str] = None
+class CameraUpdate(BaseModel):
+    nom: Optional[str] = None
+    type: Optional[str] = None
+    description: Optional[str] = None
+    localisation: Optional[str] = None
+    location_lat: Optional[float] = None
+    location_lng: Optional[float] = None
+    url_flux: Optional[str] = None
+    est_active: Optional[bool] = None
 
 class Camera(CameraBase):
-    id: int
+    id: str
 
     class Config:
         from_attributes = True

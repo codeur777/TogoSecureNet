@@ -1,248 +1,378 @@
 import { useEffect, useState } from "react";
-import PageMeta from "../components/common/PageMeta";
 import api from "../services/api";
+import PageMeta from "../components/common/PageMeta";
+import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import toast from "react-hot-toast";
+
+// Fix for default Leaflet marker icons
+import icon from "leaflet/dist/images/marker-icon.png";
+import iconShadow from "leaflet/dist/images/marker-shadow.png";
+
+let DefaultIcon = L.icon({
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+L.Marker.prototype.options.icon = DefaultIcon;
 
 type Camera = {
-  id: number;
-  name: string;
-  address: string;
+  id: string;
+  nom: string;
+  localisation: string;
   location_lat: number;
   location_lng: number;
-  status: "active" | "maintenance" | "inactive";
+  est_active: boolean;
+  type?: string;
+  description?: string;
+  url_flux?: string;
 };
+
+// Component to handle clicks on the map to pick location
+function LocationPicker({ onPick }: { onPick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onPick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
 
 export default function Cameras() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-
-  // Form State
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
-  const [lat, setLat] = useState("6.1319");
-  const [lng, setLng] = useState("1.2227");
-  const [status, setStatus] = useState<"active" | "maintenance" | "inactive">("active");
   const [saving, setSaving] = useState(false);
 
-  const fetchCameras = async () => {
+  // Form State
+  const [nom, setNom] = useState("");
+  const [localisation, setLocalisation] = useState("");
+  const [lat, setLat] = useState(6.1319);
+  const [lng, setLng] = useState(1.2227);
+  const [estActive, setEstActive] = useState(true);
+  const [type, setType] = useState("ip");
+  const [description, setDescription] = useState("");
+  const [urlFlux, setUrlFlux] = useState("");
+
+  useEffect(() => {
+    loadCameras();
+  }, []);
+
+  const loadCameras = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/api/v1/cameras");
+      const res = await api.get("/api/v1/cameras/");
       setCameras(res.data);
-    } catch (e) {
-      console.error(e);
-      // Mock Data if api fails
-      setCameras([
-        { id: 1, name: "LOM-MARCHE-01", address: "Grand Marché, Lomé", location_lat: 6.1319, location_lng: 1.2227, status: "active" },
-        { id: 2, name: "LOM-AERO-04", address: "Aéroport Débarquement", location_lat: 6.1455, location_lng: 1.2105, status: "active" },
-        { id: 3, name: "LOM-PORT-02", address: "Port Autonome Quai 3", location_lat: 6.1250, location_lng: 1.2350, status: "maintenance" },
-      ]);
+    } catch (error) {
+      console.error("Erreur de chargement des caméras:", error);
+      toast.error("Impossible de charger la liste des caméras");
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchCameras();
-  }, []);
 
   const handleAddCamera = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setSaving(true);
       const payload = {
-        name,
-        address,
-        location_lat: parseFloat(lat),
-        location_lng: parseFloat(lng),
-        status,
+        nom,
+        localisation,
+        location_lat: lat,
+        location_lng: lng,
+        est_active: estActive,
+        type,
+        description,
+        url_flux: urlFlux,
       };
-      const res = await api.post("/api/v1/cameras", payload);
-      setCameras((prev) => [...prev, res.data]);
-      setShowAddForm(false);
-      setName("");
-      setAddress("");
-      setLat("6.1319");
-      setLng("1.2227");
-    } catch (err) {
-      console.error(err);
-      // Offline fallback
-      const mockNew: Camera = {
-        id: cameras.length + 1,
-        name,
-        address,
-        location_lat: parseFloat(lat),
-        location_lng: parseFloat(lng),
-        status,
-      };
-      setCameras((prev) => [...prev, mockNew]);
-      setShowAddForm(false);
-      setName("");
-      setAddress("");
+
+      const res = await api.post("/api/v1/cameras/", payload);
+      setCameras((prev) => [res.data, ...prev]);
+      toast.success("Caméra enregistrée avec succès !");
+      resetForm();
+    } catch (error: any) {
+      console.error("Erreur d'ajout de caméra:", error);
+      toast.error(error.response?.data?.detail || "Erreur lors de l'enregistrement de la caméra.");
     } finally {
       setSaving(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === "active") return "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400";
-    if (status === "maintenance") return "bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400";
-    return "bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400";
+  const resetForm = () => {
+    setNom("");
+    setLocalisation("");
+    setLat(6.1319);
+    setLng(1.2227);
+    setEstActive(true);
+    setType("ip");
+    setDescription("");
+    setUrlFlux("");
+    setShowAddForm(false);
   };
+
+  const actives = cameras.filter((c) => c.est_active).length;
 
   return (
     <>
-      <PageMeta
-        title="Gestion des Caméras | TOGO-SecureNet"
-        description="Configuration et statut des caméras de surveillance"
-      />
-
+      <PageMeta title="Caméras | TOGO-SecureNet" description="Gestion des caméras" />
       <div className="space-y-6">
-        {/* En-tête */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">📹 Réseau de Caméras</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Enregistrez et contrôlez le statut des caméras IP déployées sur le territoire.
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+               Caméras de Surveillance
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Gérez les caméras IP déployées sur le réseau de sécurité.
             </p>
           </div>
           <button
             onClick={() => setShowAddForm(true)}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-all shadow-sm flex items-center gap-2"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors cursor-pointer"
           >
-            <span>➕</span> Ajouter une caméra
+            <span>+ Ajouter une caméra</span>
           </button>
+        </div>
+
+        {/* Métriques */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Caméras</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{cameras.length}</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Actives</p>
+            <p className="text-2xl font-bold text-green-600 mt-1">{actives}</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Inactives</p>
+            <p className="text-2xl font-bold text-red-600 mt-1">{cameras.length - actives}</p>
+          </div>
         </div>
 
         {/* Modal d'ajout */}
         {showAddForm && (
-          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-2xl p-6 shadow-xl animate-fade-in">
-              <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-white/95">Ajouter une Caméra</h3>
-                <button
-                  onClick={() => setShowAddForm(false)}
-                  className="text-gray-400 hover:text-gray-600 text-xl"
-                >
-                  ×
-                </button>
+          <div
+            className="fixed inset-x-0 bottom-0 z-[999999] bg-black/60 backdrop-blur-sm overflow-y-auto"
+            style={{ top: '64px' }}
+          >
+            <div className="flex min-h-full items-start justify-center px-4 py-8">
+              <div className="w-full max-w-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl flex flex-col">
+
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex-shrink-0">
+                  <h3 className="text-lg font-bold text-gray-800 dark:text-white">Ajouter une Nouvelle Caméra</h3>
+                  <button
+                    onClick={resetForm}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl font-semibold cursor-pointer"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleAddCamera} className="p-6 space-y-4 text-left">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                    {/* Left column — champs texte */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Nom / Identifiant *</label>
+                        <input
+                          type="text"
+                          required
+                          value={nom}
+                          onChange={(e) => setNom(e.target.value)}
+                          placeholder="Ex: LOM-MARCHE-04"
+                          className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-800 bg-transparent rounded-lg dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Type de caméra *</label>
+                        <select
+                          value={type}
+                          onChange={(e) => setType(e.target.value)}
+                          className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-lg dark:text-white focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="ip">IP Standard (RTSP)</option>
+                          <option value="esp32">ESP32-CAM (MQTT)</option>
+                          <option value="mobile">Client Mobile (App)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Adresse Physique / Localisation *</label>
+                        <input
+                          type="text"
+                          required
+                          value={localisation}
+                          onChange={(e) => setLocalisation(e.target.value)}
+                          placeholder="Ex: Grand Marché, Lomé"
+                          className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-800 bg-transparent rounded-lg dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">URL Flux Vidéo (RTSP/HTTP)</label>
+                        <input
+                          type="text"
+                          value={urlFlux}
+                          onChange={(e) => setUrlFlux(e.target.value)}
+                          placeholder="Ex: rtsp://192.168.1.100/stream1"
+                          className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-800 bg-transparent rounded-lg dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Description / Notes</label>
+                        <textarea
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Notes d'installation, marque..."
+                          rows={2}
+                          className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-800 bg-transparent rounded-lg dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                        <div>
+                          <span className="block text-sm font-semibold text-gray-800 dark:text-white">Caméra en Service</span>
+                          <span className="text-[11px] text-gray-400">Activer le flux vidéo et l'analyse intelligente</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEstActive(!estActive)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${estActive ? "bg-green-600" : "bg-gray-300 dark:bg-gray-600"}`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${estActive ? "translate-x-6" : "translate-x-1"}`} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Right column — carte Leaflet */}
+                    <div className="flex flex-col">
+                      <span className="block text-xs font-semibold text-gray-400 uppercase mb-2">
+                        Positionner sur la carte (cliquer pour placer)
+                      </span>
+                      <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 relative" style={{ height: 260 }}>
+                        <MapContainer center={[6.1319, 1.2227]} zoom={13} style={{ height: "100%", width: "100%", zIndex: 1 }}>
+                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                          <LocationPicker onPick={(pickedLat, pickedLng) => { setLat(pickedLat); setLng(pickedLng); }} />
+                          <Marker position={[lat, lng]} />
+                        </MapContainer>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Latitude</label>
+                          <input
+                            type="number"
+                            step="any"
+                            required
+                            value={lat}
+                            onChange={(e) => setLat(parseFloat(e.target.value))}
+                            className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-800 bg-transparent rounded-lg dark:text-white focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Longitude</label>
+                          <input
+                            type="number"
+                            step="any"
+                            required
+                            value={lng}
+                            onChange={(e) => setLng(parseFloat(e.target.value))}
+                            className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-800 bg-transparent rounded-lg dark:text-white focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-gray-400 mt-2 italic">
+                        💡 Cliquez sur la carte pour positionner la caméra automatiquement
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="px-5 py-2 text-sm border border-gray-200 dark:border-gray-800 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-6 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:opacity-65 transition-colors cursor-pointer"
+                    >
+                      {saving ? "Enregistrement..." : "Enregistrer la caméra"}
+                    </button>
+                  </div>
+                </form>
+
               </div>
-
-              <form onSubmit={handleAddCamera} className="mt-4 space-y-4 text-left">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Nom / Identifiant</label>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Ex: LOM-MARCHE-04"
-                    className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-800 bg-transparent rounded-lg dark:text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Adresse physique / IP</label>
-                  <input
-                    type="text"
-                    required
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Ex: Grand Marché, Lomé"
-                    className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-800 bg-transparent rounded-lg dark:text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Latitude</label>
-                    <input
-                      type="number"
-                      step="any"
-                      required
-                      value={lat}
-                      onChange={(e) => setLat(e.target.value)}
-                      className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-800 bg-transparent rounded-lg dark:text-white focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Longitude</label>
-                    <input
-                      type="number"
-                      step="any"
-                      required
-                      value={lng}
-                      onChange={(e) => setLng(e.target.value)}
-                      className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-800 bg-transparent rounded-lg dark:text-white focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Statut Initial</label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as any)}
-                    className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-lg dark:text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="active">Active (En service)</option>
-                    <option value="maintenance">Maintenance</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddForm(false)}
-                    className="px-4 py-2 text-xs border border-gray-200 dark:border-gray-800 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"
-                  >
-                    {saving ? "Enregistrement..." : "Enregistrer"}
-                  </button>
-                </div>
-              </form>
             </div>
           </div>
         )}
 
+
         {/* Liste des caméras */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {loading ? (
-            <p className="text-sm text-gray-400 col-span-3 text-center py-12">Chargement des caméras...</p>
-          ) : cameras.length === 0 ? (
-            <p className="text-sm text-gray-400 col-span-3 text-center py-12">Aucune caméra enregistrée.</p>
-          ) : (
-            cameras.map((camera) => (
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600 mx-auto"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {cameras.map((cam) => (
               <div
-                key={camera.id}
-                className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] flex flex-col justify-between"
+                key={cam.id}
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col justify-between hover:shadow-md transition-shadow"
               >
                 <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-400 font-mono">ID: {camera.id}</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getStatusBadge(camera.status)}`}>
-                      {camera.status}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex flex-col text-left">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">ID: {cam.id.slice(0, 8)}</span>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-1">{cam.nom}</h3>
+                    </div>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-semibold ${cam.est_active ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400" : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                        }`}
+                    >
+                      {cam.est_active ? "Active" : "Inactive"}
                     </span>
                   </div>
-                  <h3 className="text-base font-bold text-gray-800 dark:text-white/95 mt-2">{camera.name}</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">📍 {camera.address}</p>
+                  <div className="text-left space-y-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      📍 <span className="font-medium">Localisation:</span> {cam.localisation}
+                    </p>
+                    {cam.description && (
+                      <p className="text-xs text-gray-500 dark:text-gray-500 italic">
+                        "{cam.description}"
+                      </p>
+                    )}
+                    {cam.type && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Type: <span className="font-semibold uppercase font-mono">{cam.type}</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
-
-                <div className="border-t border-gray-100 dark:border-gray-800 mt-4 pt-3 flex items-center justify-between text-xs text-gray-400">
-                  <span>Lat: {camera.location_lat.toFixed(4)}</span>
-                  <span>Lng: {camera.location_lng.toFixed(4)}</span>
+                <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-3 flex items-center justify-between text-xs text-gray-400 font-mono">
+                  <span>Lat: {cam.location_lat?.toFixed(4) ?? "N/A"}</span>
+                  <span>Lng: {cam.location_lng?.toFixed(4) ?? "N/A"}</span>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && cameras.length === 0 && (
+          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">
+            <p className="text-gray-500">Aucune caméra enregistrée pour le moment</p>
+          </div>
+        )}
       </div>
     </>
   );

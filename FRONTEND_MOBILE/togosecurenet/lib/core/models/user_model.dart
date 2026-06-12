@@ -4,7 +4,7 @@ part 'user_model.freezed.dart';
 part 'user_model.g.dart';
 
 @freezed
-class UserModel with _$UserModel {
+abstract class UserModel with _$UserModel {
   const factory UserModel({
     required String id,
     required String email,
@@ -25,7 +25,7 @@ class UserModel with _$UserModel {
 
 // Statistics Model
 @freezed
-class UserStatsModel with _$UserStatsModel {
+abstract class UserStatsModel with _$UserStatsModel {
   const factory UserStatsModel({
     @JsonKey(name: 'completed_interventions') @Default(0) int completedInterventions,
     @JsonKey(name: 'treated_alerts') @Default(0) int treatedAlerts,

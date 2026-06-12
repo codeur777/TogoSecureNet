@@ -45,4 +45,12 @@ class AppColors {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  // ==========================================
+  // 🔄 ALIAS COMPATIBILITÉ (utilisables dans des contextes const)
+  // ==========================================
+  static const Color textDark = textPrimary;
+  static const Color textLight = white;
+  static const Color alertDanger = error;
+  static const Color alertWarning = warning;
 }

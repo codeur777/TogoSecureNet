@@ -99,4 +99,22 @@ class AuthService {
   Future<bool> isLoggedIn() async {
     return await _storage.isLoggedIn();
   }
+
+  // Update Profile
+  Future<Map<String, dynamic>> updateProfile(
+      String firstName, String lastName, String phone) async {
+    try {
+      final response = await _dio.patch(
+        '/auth/profile',
+        data: {
+          'first_name': firstName,
+          'last_name': lastName,
+          'phone': phone,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

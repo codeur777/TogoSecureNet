@@ -4,16 +4,16 @@ import api from "../services/api";
 import toast from "react-hot-toast";
 
 interface Utilisateur {
-  id: number;
-  nom: string;
-  prenom: string;
+  id: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
   email: string;
-  telephone: string;
+  phone: string;
   role: 'admin' | 'superviseur' | 'agent' | 'citoyen';
-  statut: 'actif' | 'inactif' | 'suspendu';
-  dateCreation: string;
-  derniereConnexion: string;
-  photo: string;
+  status: 'actif' | 'inactif' | 'suspendu';
+  created_at: string;
+  last_login: string;
 }
 
 const Utilisateurs = () => {
@@ -52,8 +52,15 @@ const Utilisateurs = () => {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation basique
+    if (!formData.prenom || !formData.nom || !formData.email || !formData.role || !formData.password) {
+      toast.error("Veuillez remplir tous les champs obligatoires");
+      return;
+    }
+    
     try {
-      await api.post("/api/v1/users", {
+      await api.post("/api/v1/users/", {
         first_name: formData.prenom,
         last_name: formData.nom,
         email: formData.email,
@@ -62,18 +69,20 @@ const Utilisateurs = () => {
         password: formData.password
       });
       
-      toast.success("Utilisateur créé avec succès");
+      toast.success("✅ Utilisateur créé avec succès");
       setShowModal(false);
       setFormData({ prenom: '', nom: '', email: '', telephone: '', role: '', password: '' });
-      fetchUtilisateurs();
+      
+      // Recharger la liste des utilisateurs
+      await fetchUtilisateurs();
     } catch (error: any) {
       console.error("Erreur création utilisateur:", error);
-      const errorMsg = error.response?.data?.detail || "Erreur lors de la création";
+      const errorMsg = error.response?.data?.detail || "Erreur lors de la création de l'utilisateur";
       toast.error(errorMsg);
     }
   };
 
-  const handleDeleteUser = async (id: number) => {
+  const handleDeleteUser = async (id: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ?")) return;
     
     try {
@@ -86,16 +95,7 @@ const Utilisateurs = () => {
     }
   };
 
-  const handleUpdateStatus = async (id: number, newStatus: string) => {
-    try {
-      await api.patch(`/api/v1/users/${id}`, { status: newStatus });
-      toast.success("Statut mis à jour");
-      fetchUtilisateurs();
-    } catch (error) {
-      console.error("Erreur mise à jour:", error);
-      toast.error("Impossible de mettre à jour le statut");
-    }
-  };
+
 
   const filteredUtilisateurs = utilisateurs.filter(u =>
     filter === 'tous' ? true : u.role === filter
@@ -249,17 +249,15 @@ const Utilisateurs = () => {
                   <tr key={utilisateur.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/30 transition">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={utilisateur.photo || "/images/user/user-01.png"}
-                          alt={`${utilisateur.prenom} ${utilisateur.nom}`}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
+                        <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-900 flex items-center justify-center font-semibold text-brand-700 dark:text-brand-300">
+                          {utilisateur.first_name?.charAt(0)}{utilisateur.last_name?.charAt(0)}
+                        </div>
                         <div>
                           <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                            {utilisateur.prenom} {utilisateur.nom}
+                            {utilisateur.full_name || `${utilisateur.first_name} ${utilisateur.last_name}`}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            ID: #{utilisateur.id}
+                            ID: #{utilisateur.id.slice(0, 8)}
                           </p>
                         </div>
                       </div>
@@ -267,7 +265,7 @@ const Utilisateurs = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">
                         <p className="text-gray-900 dark:text-white">{utilisateur.email}</p>
-                        <p className="text-gray-500 dark:text-gray-400">{utilisateur.telephone}</p>
+                        <p className="text-gray-500 dark:text-gray-400">{utilisateur.phone || "—"}</p>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -276,12 +274,12 @@ const Utilisateurs = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatutBadge(utilisateur.statut)}`}>
-                        {utilisateur.statut.charAt(0).toUpperCase() + utilisateur.statut.slice(1)}
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatutBadge(utilisateur.status)}`}>
+                        {utilisateur.status.charAt(0).toUpperCase() + utilisateur.status.slice(1)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                      {utilisateur.derniereConnexion ? new Date(utilisateur.derniereConnexion).toLocaleString('fr-FR') : 'Jamais'}
+                      {utilisateur.last_login ? new Date(utilisateur.last_login).toLocaleString('fr-FR') : 'Jamais'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">

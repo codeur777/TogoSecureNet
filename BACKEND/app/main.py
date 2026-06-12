@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from app.core.database import engine
 from app.models import Base
 from app.core.config import settings
@@ -11,6 +12,10 @@ from app.api import (
 )
 from app.mqtt_client import start_mqtt
 from contextlib import asynccontextmanager
+import os
+
+# Créer le dossier uploads
+os.makedirs("uploads/signalements", exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,10 +37,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Servir les fichiers média
-app.mount("/static", StaticFiles(directory="uploads"), name="static")
+# Routes API (avant les fichiers statiques)
+@app.get("/")
+def root():
+    return {"message": "Togo SecureNet API is running"}
 
-# Routes
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(signalements.router, prefix="/api/v1/signalements", tags=["Signalements"])
 app.include_router(personnes_disparues.router, prefix="/api/v1/personnes-disparues", tags=["Personnes Disparues"])
@@ -51,10 +61,8 @@ app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
 app.include_router(portrait_robot.router, prefix="/api/v1/portrait-robot", tags=["Portrait Robot"])
 app.include_router(websocket.router, prefix="/ws", tags=["WebSocket"])
 
-@app.get("/")
-def root():
-    return {"message": "Togo SecureNet API is running"}
-
-@app.get("/health")
-def health():
-    return {"status": "healthy"}
+# Route pour servir les fichiers uploadés
+@app.get("/static/signalements/{filename}")
+async def serve_upload(filename: str):
+    file_path = f"uploads/signalements/{filename}"
+    return FileResponse(file_path)

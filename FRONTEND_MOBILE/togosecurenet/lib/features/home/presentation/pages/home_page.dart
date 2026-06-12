@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/alerts_provider.dart';
 import '../../../../core/providers/intervention_provider.dart';
+import '../../../../core/models/alert_model.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../alerts/presentation/pages/alerts_page.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
@@ -173,7 +174,7 @@ class _HomeContent extends ConsumerWidget {
                         child: StatCard(
                           icon: Icons.pending_actions_rounded,
                           label: 'En cours',
-                          value: '${interventionState.inProgressCount}',
+                          value: '${ref.watch(interventionProvider.notifier).inProgressCount}',
                           color: AppColors.primary,
                         ),
                       ),
@@ -280,10 +281,10 @@ class _HomeContent extends ConsumerWidget {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: alert.estLue
+                            color: alert.status != AlertStatus.pending
                                 ? Colors.grey[300]!
                                 : AppColors.primary,
-                            width: alert.estLue ? 1 : 2,
+                            width: alert.status != AlertStatus.pending ? 1 : 2,
                           ),
                           boxShadow: [
                             BoxShadow(
@@ -299,12 +300,12 @@ class _HomeContent extends ConsumerWidget {
                               width: 48,
                               height: 48,
                               decoration: BoxDecoration(
-                                color: _getGravityColor(alert.niveauGravite).withOpacity(0.1),
+                                color: _getGravityColor(alert.severity).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
                                 Icons.warning_rounded,
-                                color: _getGravityColor(alert.niveauGravite),
+                                color: _getGravityColor(alert.severity),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -313,7 +314,7 @@ class _HomeContent extends ConsumerWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    alert.typeDetection ?? 'Alerte',
+                                    alert.cameraName ?? 'Détection intelligente',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: 14,
@@ -321,7 +322,7 @@ class _HomeContent extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    alert.message ?? 'Nouvelle détection',
+                                    alert.description ?? 'Alerte de sécurité',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey[600],
@@ -351,13 +352,13 @@ class _HomeContent extends ConsumerWidget {
     );
   }
 
-  Color _getGravityColor(String gravity) {
-    switch (gravity) {
-      case 'tres_grave':
+  Color _getGravityColor(AlertSeverity severity) {
+    switch (severity) {
+      case AlertSeverity.verySerious:
         return AppColors.alertDanger;
-      case 'grave':
+      case AlertSeverity.serious:
         return AppColors.alertWarning;
-      default:
+      case AlertSeverity.notSerious:
         return AppColors.primary;
     }
   }

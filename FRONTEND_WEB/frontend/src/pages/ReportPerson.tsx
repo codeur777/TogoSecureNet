@@ -28,6 +28,7 @@ export default function ReportPerson() {
 
     try {
       // Logique d'envoi au backend à implémenter
+      console.log("Signalement soumis:", { formData, photo });
       await new Promise(resolve => setTimeout(resolve, 1500));
       toast.success("Signalement enregistré avec succès. Référence: #TSN" + Math.random().toString(36).substring(7).toUpperCase());
       setTimeout(() => navigate("/"), 2000);
@@ -58,9 +59,9 @@ export default function ReportPerson() {
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <Link to="/" className="flex items-center gap-2">
-                <img 
-                  src="/images/logo_emble-removebg.png" 
-                  alt="TogoSecureNet Logo" 
+                <img
+                  src="/images/logo_emble-removebg.png"
+                  alt="TogoSecureNet Logo"
                   className="h-8 w-8"
                 />
                 <span className="font-bold text-green-800 text-lg">TogoSecureNet</span>
@@ -99,7 +100,7 @@ export default function ReportPerson() {
                   <h2 className="text-xl font-semibold text-gray-800 border-b pb-2">
                     Informations sur la personne
                   </h2>
-                  
+
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label>Nom complet <span className="text-red-500">*</span></Label>

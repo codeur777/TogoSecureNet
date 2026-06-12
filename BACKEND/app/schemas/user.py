@@ -23,35 +23,36 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
 
 class UserResponse(BaseModel):
-    id: int
+    id: str
     email: EmailStr
-    nom: str
-    prenom: str
-    telephone: str
+    first_name: str = ""
+    last_name: str = ""
+    full_name: str = ""
+    phone: Optional[str] = None
     role: str
-    statut: str = "actif"
-    dateCreation: Optional[datetime] = None
-    derniereConnexion: Optional[datetime] = None
-    photo: str = "/images/user/user-01.png"
+    status: str = "actif"
+    created_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True
     
     @classmethod
     def model_validate(cls, obj, **kwargs):
-        # Mapper les champs du modèle DB aux champs attendus par le frontend
+        # Générer full_name s'il n'existe pas
         if hasattr(obj, '__dict__'):
+            full_name = obj.full_name if obj.full_name else f"{obj.first_name or ''} {obj.last_name or ''}".strip()
             data = {
-                "id": obj.id,
+                "id": str(obj.id),
                 "email": obj.email,
-                "nom": obj.last_name or "",
-                "prenom": obj.first_name or "",
-                "telephone": obj.phone or "",
+                "first_name": obj.first_name or "",
+                "last_name": obj.last_name or "",
+                "full_name": full_name or "Utilisateur",
+                "phone": obj.phone,
                 "role": obj.role,
-                "statut": obj.status if hasattr(obj, 'status') else "actif",
-                "dateCreation": obj.created_at if hasattr(obj, 'created_at') else None,
-                "derniereConnexion": obj.last_login if hasattr(obj, 'last_login') else None,
-                "photo": "/images/user/user-01.png"
+                "status": obj.status if hasattr(obj, 'status') else "actif",
+                "created_at": obj.created_at if hasattr(obj, 'created_at') else None,
+                "last_login": obj.last_login if hasattr(obj, 'last_login') else None,
             }
             return cls(**data)
         return super().model_validate(obj, **kwargs)

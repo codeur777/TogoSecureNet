@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/models/alert_model.dart';
 import '../../../../core/models/intervention_model.dart';
 import '../../../../core/providers/intervention_provider.dart';
 
@@ -53,7 +54,6 @@ class ActiveInterventionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final alert = intervention.alert;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -107,7 +107,7 @@ class ActiveInterventionCard extends ConsumerWidget {
                     const Icon(Icons.location_on, color: Colors.white, size: 14),
                     const SizedBox(width: 4),
                     Text(
-                      alert?.localisation ?? 'Position inconnue',
+                      intervention.alert?.cameraName ?? 'Position inconnue',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -128,7 +128,7 @@ class ActiveInterventionCard extends ConsumerWidget {
                 radius: 30,
                 backgroundColor: Colors.white,
                 child: Icon(
-                  alert?.niveauGravite == 'tres_grave'
+                  intervention.alert?.severity == AlertSeverity.verySerious
                       ? Icons.warning_rounded
                       : Icons.info_rounded,
                   color: AppColors.primary,
@@ -141,7 +141,7 @@ class ActiveInterventionCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      alert?.typeDetection ?? 'Détection',
+                      intervention.alert?.personName ?? 'Détection',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -150,7 +150,7 @@ class ActiveInterventionCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      alert?.message ?? 'Intervention en cours',
+                      intervention.alert?.description ?? 'Intervention en cours',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
                         fontSize: 14,
@@ -171,7 +171,7 @@ class ActiveInterventionCard extends ConsumerWidget {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    context.push('/alerts/${alert?.id}');
+                    context.push('/alerts/${intervention.alert?.id}');
                   },
                   icon: const Icon(Icons.visibility, size: 18),
                   label: const Text('Voir détails'),

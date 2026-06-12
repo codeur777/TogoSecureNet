@@ -26,7 +26,7 @@ enum AlertStatus {
 }
 
 @freezed
-class AlertModel with _$AlertModel {
+abstract class AlertModel with _$AlertModel {
   const factory AlertModel({
     required String id,
     @JsonKey(name: 'person_name') required String personName,

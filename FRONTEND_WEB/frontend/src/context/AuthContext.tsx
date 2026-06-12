@@ -12,6 +12,8 @@ interface User {
   phone: string;
   role: UserRole;
   two_factor_enabled: boolean;
+  must_change_password?: boolean;
+  is_verified?: boolean;
 }
 
 interface AuthContextType {
@@ -62,6 +64,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("refresh_token", res.data.refresh_token);
     const meRes = await api.get("/api/v1/auth/me");
     setUser(meRes.data);
+    
+    // Vérifier si l'utilisateur doit changer son mot de passe
+    if (meRes.data.must_change_password) {
+      navigate("/force-change-password");
+      return { requires_otp: false };
+    }
+    
     navigate(meRes.data.role === "citoyen" ? "/citoyen/dashboard" : "/dashboard");
     return { requires_otp: false };
   };
@@ -72,6 +81,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("refresh_token", res.data.refresh_token);
     const meRes = await api.get("/api/v1/auth/me");
     setUser(meRes.data);
+    
+    // Vérifier si l'utilisateur doit changer son mot de passe
+    if (meRes.data.must_change_password) {
+      navigate("/force-change-password");
+      return;
+    }
+    
     navigate(meRes.data.role === "citoyen" ? "/citoyen/dashboard" : "/dashboard");
   };
 

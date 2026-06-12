@@ -1,19 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_model.dart';
 import '../storage/secure_storage.dart';
+import '../network/dio_client.dart';
 import '../../features/auth/data/auth_service.dart';
-
-// Provider pour AuthService
-final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService();
-});
 
 // Provider pour SecureStorage
 final secureStorageProvider = Provider<SecureStorage>((ref) {
   return SecureStorage();
 });
 
-// StateNotifier pour gérer l'état d'authentification
+// Provider pour AuthService
+final authServiceProvider = Provider<AuthService>((ref) {
+  final dio = ref.watch(dioProvider);
+  final storage = ref.watch(secureStorageProvider);
+  return AuthService(dio, storage);
+});
+
+// État d'authentification
 class AuthState {
   final UserModel? user;
   final bool isAuthenticated;
@@ -29,12 +32,13 @@ class AuthState {
 
   AuthState copyWith({
     UserModel? user,
+    bool clearUser = false,
     bool? isAuthenticated,
     bool? isLoading,
     String? error,
   }) {
     return AuthState(
-      user: user ?? this.user,
+      user: clearUser ? null : user ?? this.user,
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       isLoading: isLoading ?? this.isLoading,
       error: error,
@@ -42,23 +46,26 @@ class AuthState {
   }
 }
 
-class AuthNotifier extends StateNotifier<AuthState> {
-  final AuthService _authService;
-  final SecureStorage _storage;
+// Riverpod 3.x : Notifier<T>
+class AuthNotifier extends Notifier<AuthState> {
+  late AuthService _authService;
+  late SecureStorage _storage;
 
-  AuthNotifier(this._authService, this._storage) : super(AuthState()) {
+  @override
+  AuthState build() {
+    _authService = ref.watch(authServiceProvider);
+    _storage = ref.watch(secureStorageProvider);
     _checkAuth();
+    return AuthState();
   }
 
   Future<void> _checkAuth() async {
     final token = await _storage.getAccessToken();
     if (token != null) {
       try {
-        final user = await _authService.getCurrentUser();
-        state = state.copyWith(
-          user: user,
-          isAuthenticated: true,
-        );
+        final userMap = await _authService.getCurrentUser();
+        final user = UserModel.fromJson(userMap);
+        state = state.copyWith(user: user, isAuthenticated: true);
       } catch (e) {
         await logout();
       }
@@ -69,16 +76,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await _authService.login(email, password);
-      
+
       if (response['requires_otp'] == true) {
-        state = state.copyWith(isLoading: false);
-        return false; // Besoin OTP
+        state = state.copyWith(isLoading: false, clearUser: true);
+        return false;
       }
 
       await _storage.saveAccessToken(response['access_token']);
       await _storage.saveRefreshToken(response['refresh_token']);
-      
-      final user = await _authService.getCurrentUser();
+
+      final userMap = await _authService.getCurrentUser();
+      final user = UserModel.fromJson(userMap);
       state = state.copyWith(
         user: user,
         isAuthenticated: true,
@@ -88,6 +96,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
+        clearUser: true,
         error: e.toString(),
       );
       return false;
@@ -98,11 +107,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await _authService.verifyOtp(email, otp);
-      
+
       await _storage.saveAccessToken(response['access_token']);
       await _storage.saveRefreshToken(response['refresh_token']);
-      
-      final user = await _authService.getCurrentUser();
+
+      final userMap = await _authService.getCurrentUser();
+      final user = UserModel.fromJson(userMap);
       state = state.copyWith(
         user: user,
         isAuthenticated: true,
@@ -112,6 +122,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
+        clearUser: true,
         error: e.toString(),
       );
       return false;
@@ -122,39 +133,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final refreshToken = await _storage.getRefreshToken();
     if (refreshToken != null) {
       try {
-        await _authService.logout(refreshToken);
+        await _authService.logout();
       } catch (e) {
-        // Ignore errors during logout
+        // Échec silencieux côté API
       }
     }
-    
     await _storage.clearAll();
     state = AuthState();
   }
 
-  Future<void> updateProfile(String firstName, String lastName, String phone) async {
+  Future<void> updateProfile(
+      String firstName, String lastName, String phone) async {
     if (state.user == null) return;
-    
+
     state = state.copyWith(isLoading: true);
     try {
       await _authService.updateProfile(firstName, lastName, phone);
-      final updatedUser = await _authService.getCurrentUser();
-      state = state.copyWith(
-        user: updatedUser,
-        isLoading: false,
-      );
+      final updatedUserMap = await _authService.getCurrentUser();
+      final updatedUser = UserModel.fromJson(updatedUserMap);
+      state = state.copyWith(user: updatedUser, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 }
 
-// Provider principal pour l'authentification
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  final storage = ref.watch(secureStorageProvider);
-  return AuthNotifier(authService, storage);
-});
+// Riverpod 3.x : NotifierProvider
+final authProvider = NotifierProvider<AuthNotifier, AuthState>(
+  AuthNotifier.new,
+);
