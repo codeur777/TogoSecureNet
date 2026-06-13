@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import PageMeta from "../components/common/PageMeta";
+import PhoneInput from "../components/form/PhoneInput";
 import api from "../services/api";
 import toast from "react-hot-toast";
 
@@ -366,14 +367,15 @@ const Utilisateurs = () => {
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-white"
                 />
-                <input
-                  type="tel"
-                  placeholder="Téléphone"
-                  required
-                  value={formData.telephone}
-                  onChange={(e) => setFormData({...formData, telephone: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-white"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone</label>
+                  <PhoneInput
+                    value={formData.telephone}
+                    onChange={(val) => setFormData({...formData, telephone: val || ""})}
+                    required
+                    placeholder="Numéro de téléphone"
+                  />
+                </div>
                 <select 
                   required
                   value={formData.role}

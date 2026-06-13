@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, ForeignKey, Date
+from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, ForeignKey, Date, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -21,6 +21,8 @@ class EnginVole(Base):
     type_engin = Column(String, nullable=False)  # moto, voiture, etc.
     plaque_immatriculation = Column(String, unique=True, nullable=False)
     date_vol = Column(Date)
+    lieu_vol = Column(String)  # Lieu du vol
+    circonstances = Column(Text)  # Circonstances détaillées du vol
     statut = Column(SQLEnum(StatutEnginEnum), default=StatutEnginEnum.RECHERCHE)
     
     # Foreign Keys

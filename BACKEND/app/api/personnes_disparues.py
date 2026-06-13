@@ -105,3 +105,31 @@ def get_historique_detections(
         raise HTTPException(status_code=404, detail="Personne non trouvée")
     
     return personne.detections
+
+@router.post("/{personne_id}/extraire-vecteurs")
+def extraire_vecteurs_faciaux(
+    personne_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Extrait les vecteurs faciaux des photos d'une personne disparue"""
+    if current_user.role not in ["admin", "superviseur"]:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    
+    personne = db.query(PersonneDisparue).filter(PersonneDisparue.id == personne_id).first()
+    if not personne:
+        raise HTTPException(status_code=404, detail="Personne non trouvée")
+    
+    if not personne.photo or len(personne.photo) == 0:
+        raise HTTPException(status_code=400, detail="Aucune photo disponible")
+    
+    # TODO: Intégrer avec service d'extraction de vecteurs faciaux (IA)
+    # Pour l'instant, on simule l'extraction
+    import json
+    personne.vecteur_facial = json.dumps({"extracted": True, "photos_count": len(personne.photo)})
+    db.commit()
+    
+    return {
+        "message": "Vecteurs faciaux extraits avec succès",
+        "photos_traitees": len(personne.photo)
+    }

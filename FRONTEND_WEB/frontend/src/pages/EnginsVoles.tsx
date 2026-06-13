@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import PageMeta from "../components/common/PageMeta";
 import api from "../services/api";
-import { TruckIcon, MagnifyingGlassIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 
 interface EnginVole {
@@ -19,7 +18,7 @@ const EnginsVoles = () => {
   const [engins, setEngins] = useState<EnginVole[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"tous" | "recherche" | "retrouve" | "clos">("tous");
-  const [typeFilter, setTypeFilter] = useState<"tous" | EnginVole["type"]>("tous");
+  const [typeFilter, setTypeFilter] = useState<"tous" | string>("tous");
   const [search, setSearch] = useState("");
 
   const fetchEngins = useCallback(async () => {
@@ -94,7 +93,10 @@ const EnginsVoles = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="p-3 bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 rounded-xl shrink-0">
-              <TruckIcon className="h-6 w-6" />
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+              </svg>
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Engins Volés</h1>
@@ -106,7 +108,9 @@ const EnginsVoles = () => {
           <div className="flex items-center gap-2">
             <button onClick={fetchEngins} title="Actualiser"
               className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-              <ArrowPathIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              <svg className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
             </button>
           </div>
         </div>
@@ -129,7 +133,9 @@ const EnginsVoles = () => {
         {/* Recherche + Filtres */}
         <div className="space-y-3">
           <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
             <input type="text" placeholder="Rechercher par marque, immatriculation ou lieu..." value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/[0.03] rounded-xl dark:text-white focus:outline-none focus:border-orange-500 transition-colors"
@@ -179,7 +185,10 @@ const EnginsVoles = () => {
           </div>
         ) : filteredEngins.length === 0 ? (
           <div className="text-center py-16">
-            <TruckIcon className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" />
+            <svg className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+            </svg>
             <p className="text-sm text-gray-400 font-medium">
               {search || filter !== "tous" || typeFilter !== "tous" ? "Aucun engin ne correspond aux filtres." : "Aucun signalement enregistré."}
             </p>
@@ -190,8 +199,8 @@ const EnginsVoles = () => {
               <div key={engin.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="relative">
                   <img
-                    src={`https://via.placeholder.com/400x200/f97316/fff?text=${encodeURIComponent(e.marque)}`}
-                    alt={`${e.marque} ${e.modele}`}
+                    src={`https://via.placeholder.com/400x200/f97316/fff?text=${encodeURIComponent(engin.marque)}`}
+                    alt={`${engin.marque} ${engin.modele}`}
                     className="w-full h-48 object-cover"
                   />
                   <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-semibold ${getStatutBadge(engin.statut)}`}>

@@ -88,6 +88,18 @@ def signup(data: SignupRequest, db: Session = Depends(deps.get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(400, "Email déjà utilisé")
     
+    # Valider le téléphone si fourni
+    if data.phone:
+        from app.utils.phone_utils import validate_phone_number
+        is_valid, result = validate_phone_number(data.phone)
+        if not is_valid:
+            raise HTTPException(400, f"Téléphone invalide: {result}")
+        data.phone = result  # Format E164
+    
+    # Vérifier si des signalements existent déjà pour cet email/téléphone
+    from app.services.signalement_service import count_signalements_by_contact
+    nb_signalements = count_signalements_by_contact(db, email=data.email, phone=data.phone)
+    
     # Stocker données temporaires en Redis
     import json
     from app.redis_client import redis_client
@@ -97,16 +109,28 @@ def signup(data: SignupRequest, db: Session = Depends(deps.get_db)):
         "first_name": data.first_name,
         "last_name": data.last_name,
         "phone": data.phone,
+        "nb_signalements": nb_signalements,  # Stocker le nombre pour affichage
     }
     redis_client.setex(f"signup_pending:{data.email}", 600, json.dumps(signup_data))
     
     # Envoyer OTP
     otp = store_otp(data.email, purpose="signup")
+    print(f"\n{'='*50}\n🔐 OTP SIGNUP pour {data.email}: {otp}\n{'='*50}\n")
     email_sent = send_otp_email(data.email, otp, purpose="signup")
     if not email_sent:
         raise HTTPException(500, "Erreur lors de l'envoi de l'email OTP")
     
-    return {"message": "Code de vérification envoyé par email", "requires_otp": True}
+    response = {
+        "message": "Code de vérification envoyé par email", 
+        "requires_otp": True
+    }
+    
+    # Informer l'utilisateur si des signalements seront rattachés
+    if nb_signalements > 0:
+        response["found_signalements"] = nb_signalements
+        response["info_message"] = f"Nous avons retrouvé {nb_signalements} signalement{'s' if nb_signalements > 1 else ''} associé{'s' if nb_signalements > 1 else ''} à cette adresse. {'Ils' if nb_signalements > 1 else 'Il'} {'seront' if nb_signalements > 1 else 'sera'} automatiquement rattaché{'s' if nb_signalements > 1 else ''} à votre compte après validation de votre inscription."
+    
+    return response
 
 @router.post("/signup/verify")
 def signup_verify(data: SignupVerifyRequest, db: Session = Depends(deps.get_db)):
@@ -139,10 +163,30 @@ def signup_verify(data: SignupVerifyRequest, db: Session = Depends(deps.get_db))
         two_factor_enabled=False,
     )
     db.add(user)
+    db.flush()  # Pour obtenir l'ID sans committer
+    
+    # Lier les signalements existants après création du compte
+    from app.services.signalement_service import find_signalements_by_contact, link_signalements_to_user
+    signalements_found = find_signalements_by_contact(
+        db, 
+        email=signup_data["email"], 
+        phone=signup_data.get("phone")
+    )
+    
+    nb_linked = 0
+    if signalements_found:
+        nb_linked = link_signalements_to_user(db, user.id, signalements_found)
+    
     db.commit()
     redis_client.delete(f"signup_pending:{data.email}")
     
-    return {"message": "Compte créé avec succès"}
+    response = {"message": "Compte créé avec succès"}
+    
+    if nb_linked > 0:
+        response["signalements_linked"] = nb_linked
+        response["info_message"] = f"{nb_linked} signalement{'s' if nb_linked > 1 else ''} {'ont' if nb_linked > 1 else 'a'} été rattaché{'s' if nb_linked > 1 else ''} à votre compte"
+    
+    return response
 
 
 @router.post("/login")

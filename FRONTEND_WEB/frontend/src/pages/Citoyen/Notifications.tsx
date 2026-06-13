@@ -1,69 +1,66 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import PageMeta from "../../components/common/PageMeta";
+import api from "../../services/api";
+import toast from "react-hot-toast";
 
 interface Notification {
-  id: number;
+  id: string;
   type: 'validation' | 'rejet' | 'retrouve' | 'information' | 'systeme';
   titre: string;
   message: string;
-  date: string;
+  created_at: string;
   lu: boolean;
-  signalementId?: number;
+  signalement_id?: string;
 }
 
 const CitoyenNotifications = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: 1,
-      type: "validation",
-      titre: "Signalement validé",
-      message: "Votre signalement #123 concernant Jean KOUAME a été validé par les autorités. Les recherches sont en cours.",
-      date: "2024-01-20T14:30:00",
-      lu: false,
-      signalementId: 123
-    },
-    {
-      id: 2,
-      type: "retrouve",
-      titre: "Personne retrouvée",
-      message: "Excellente nouvelle ! La personne de votre signalement #120 a été retrouvée saine et sauve. Merci pour votre contribution.",
-      date: "2024-01-19T10:00:00",
-      lu: false,
-      signalementId: 120
-    },
-    {
-      id: 3,
-      type: "information",
-      titre: "Information manquante",
-      message: "Veuillez compléter les informations de votre signalement #124 pour faciliter les recherches.",
-      date: "2024-01-18T16:45:00",
-      lu: true,
-      signalementId: 124
-    },
-    {
-      id: 4,
-      type: "systeme",
-      titre: "Bienvenue sur TogoSecureNet",
-      message: "Merci de votre inscription. Votre compte citoyen a été créé avec succès.",
-      date: "2024-01-15T08:00:00",
-      lu: true
-    },
-  ]);
-
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'tous' | 'non-lu'>('tous');
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get("/api/v1/notifications/");
+        setNotifications(Array.isArray(res.data) ? res.data : []);
+      } catch (e: any) {
+        console.error(e);
+        toast.error("Erreur lors du chargement des notifications.");
+        setNotifications([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
 
   const filteredNotifications = notifications.filter(n =>
     filter === 'tous' ? true : !n.lu
   );
 
-  const marquerCommeLu = (id: number) => {
-    setNotifications(notifications.map(n =>
-      n.id === id ? { ...n, lu: true } : n
-    ));
+  const marquerCommeLu = async (id: string) => {
+    try {
+      await api.put(`/api/v1/notifications/${id}/mark-read`);
+      setNotifications(notifications.map(n =>
+        n.id === id ? { ...n, lu: true } : n
+      ));
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Erreur lors de la mise à jour.");
+    }
   };
 
-  const marquerToutCommeLu = () => {
-    setNotifications(notifications.map(n => ({ ...n, lu: true })));
+  const marquerToutCommeLu = async () => {
+    try {
+      await api.put("/api/v1/notifications/mark-all-read");
+      setNotifications(notifications.map(n => ({ ...n, lu: true })));
+      toast.success("Toutes les notifications sont marquées comme lues");
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Erreur lors de la mise à jour.");
+    }
   };
 
   const getTypeIcon = (type: string) => {
@@ -171,8 +168,23 @@ const CitoyenNotifications = () => {
         )}
       </div>
 
-      <div className="space-y-4">
-        {filteredNotifications.map((notification) => (
+      {loading ? (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 animate-pulse">
+              <div className="flex gap-4">
+                <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredNotifications.map((notification) => (
           <div
             key={notification.id}
             className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border ${
@@ -193,18 +205,18 @@ const CitoyenNotifications = () => {
                     )}
                   </h3>
                   <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                    {new Date(notification.date).toLocaleDateString('fr-FR')}
+                    {new Date(notification.created_at).toLocaleDateString('fr-FR')}
                   </span>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">
                   {notification.message}
                 </p>
-                {notification.signalementId && (
+                {notification.signalement_id && (
                   <a
                     href={`/citoyen/mes-signalements`}
                     className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
                   >
-                    Voir le signalement #{notification.signalementId}
+                    Voir le signalement
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
@@ -213,8 +225,9 @@ const CitoyenNotifications = () => {
               </div>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {filteredNotifications.length === 0 && (
         <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">

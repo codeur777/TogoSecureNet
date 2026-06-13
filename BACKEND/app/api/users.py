@@ -83,6 +83,14 @@ def create_user(
             detail="Cet email est déjà utilisé"
         )
     
+    # Valider le téléphone si fourni
+    if user_data.phone:
+        from app.utils.phone_utils import validate_phone_number
+        is_valid, result = validate_phone_number(user_data.phone)
+        if not is_valid:
+            raise HTTPException(400, f"Téléphone invalide: {result}")
+        user_data.phone = result  # Format E164
+    
     # Créer l'utilisateur
     hashed_password = get_password_hash(user_data.password)
     full_name = f"{user_data.first_name} {user_data.last_name}".strip()

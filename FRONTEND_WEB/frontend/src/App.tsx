@@ -88,7 +88,7 @@ export default function App() {
               <Route path="/alertes" element={<Alertes />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/signalements" element={<Signalements />} />
-              <Route path="/gestion-signalements" element={<GestionSignalements />} />
+              <Route path="/gestion-signalements/:id" element={<GestionSignalements />} />
               <Route path="/detections" element={<Detections />} />
               <Route path="/portrait-robot" element={<PortraitRobot />} />
               <Route path="/statistiques" element={<Statistiques />} />

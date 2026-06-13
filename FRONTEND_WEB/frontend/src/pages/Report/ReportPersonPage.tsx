@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import PhoneInput from '../../components/form/PhoneInput';
+import api from '../../services/api';
+import toast from 'react-hot-toast';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = '/api/v1';
 
 type Step = 1 | 2 | 3;
 
 interface FormData {
   // Étape 1: Informations déclarant
   declarant_nom: string;
-  declarant_contact: string;
+  declarant_email: string;
+  declarant_phone: string;
   
   // Étape 2: Informations personne
   nom: string;
@@ -20,24 +23,24 @@ interface FormData {
   date_disparition: string;
   lieu_disparition: string;
   description: string;
-  photos: string[];  // URLs des photos
+  photoFiles: File[];  // Fichiers photos (pas URLs)
 }
 
 export default function ReportPersonPage() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     declarant_nom: '',
-    declarant_contact: '',
+    declarant_email: '',
+    declarant_phone: '',
     nom: '',
     prenoms: '',
     age: '',
     date_disparition: '',
     lieu_disparition: '',
     description: '',
-    photos: [],
+    photoFiles: [],
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -47,43 +50,23 @@ export default function ReportPersonPage() {
     });
   };
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    setUploadingPhotos(true);
-    const uploadedUrls: string[] = [];
+    const newFiles = Array.from(files);
+    setFormData(prev => ({
+      ...prev,
+      photoFiles: [...prev.photoFiles, ...newFiles]
+    }));
 
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const formData = new FormData();
-        formData.append('file', files[i]);
-
-        const response = await axios.post(`${API_BASE_URL}/signalements/upload-photo`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-
-        uploadedUrls.push(response.data.url);
-      }
-
-      setFormData(prev => ({
-        ...prev,
-        photos: [...prev.photos, ...uploadedUrls]
-      }));
-
-      alert(`${uploadedUrls.length} photo(s) uploadée(s) avec succès`);
-    } catch (error) {
-      console.error('Erreur upload:', error);
-      alert('Erreur lors de l\'upload des photos');
-    } finally {
-      setUploadingPhotos(false);
-    }
+    toast.success(`${newFiles.length} photo(s) ajoutée(s)`);
   };
 
   const removePhoto = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      photos: prev.photos.filter((_, i) => i !== index)
+      photoFiles: prev.photoFiles.filter((_, i) => i !== index)
     }));
   };
 
@@ -102,54 +85,55 @@ export default function ReportPersonPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Vérifier qu'on est bien à la dernière étape
     if (currentStep !== 3) {
-      alert('Veuillez compléter toutes les étapes');
+      toast.error('Veuillez compléter toutes les étapes');
       return;
     }
 
-    // Vérifier qu'au moins une photo est uploadée
-    if (formData.photos.length === 0) {
-      alert('Au moins une photo est obligatoire');
+    if (formData.photoFiles.length === 0) {
+      toast.error('Au moins une photo est obligatoire');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // Créer le signalement
-      const signalementResponse = await axios.post(`${API_BASE_URL}/signalements/`, {
-        declarant_nom: formData.declarant_nom,
-        declarant_contact: formData.declarant_contact,
-        type_signalement: 'personne_disparue',
+      // Créer FormData pour l'API atomique
+      const submitData = new FormData();
+      submitData.append('declarant_nom', formData.declarant_nom);
+      if (formData.declarant_email) submitData.append('declarant_email', formData.declarant_email);
+      if (formData.declarant_phone) submitData.append('declarant_phone', formData.declarant_phone);
+      submitData.append('nom', formData.nom);
+      submitData.append('prenoms', formData.prenoms);
+      submitData.append('age', formData.age);
+      submitData.append('date_disparition', formData.date_disparition);
+      submitData.append('lieu_disparition', formData.lieu_disparition);
+      if (formData.description) submitData.append('description', formData.description);
+      
+      // Ajouter les fichiers photos
+      formData.photoFiles.forEach((file) => {
+        submitData.append('photos', file);
       });
 
-      const signalementId = signalementResponse.data.id;
-
-      // Créer la personne disparue (endpoint public) - sans niveau_gravite
-      const personneResponse = await axios.post(`${API_BASE_URL}/signalements/personne`, {
-        signalement_id: signalementId,
-        nom: formData.nom,
-        prenoms: formData.prenoms,
-        age: formData.age,
-        date_disparition: formData.date_disparition,
-        lieu_disparition: formData.lieu_disparition,
-        description: formData.description,
-        photos: formData.photos,
+      const response = await api.post(`${API_BASE_URL}/signalements/personne-complete`, submitData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      alert('Signalement enregistré avec succès !\nNuméro de suivi: ' + personneResponse.data.numero_suivi + '\nConservez ce numéro pour suivre votre demande.');
-      navigate('/');
+      toast.success(`Signalement enregistré!\nNuméro de suivi: ${response.data.numero_suivi}`, {
+        duration: 6000,
+      });
+      setTimeout(() => navigate('/'), 2000);
     } catch (error: any) {
       console.error('Erreur:', error);
-      alert(error.response?.data?.detail || 'Erreur lors de l\'enregistrement');
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'enregistrement');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const isStep1Valid = () => {
-    return formData.declarant_nom.trim() !== '' && formData.declarant_contact.trim() !== '';
+    return formData.declarant_nom.trim() !== '' && 
+           (formData.declarant_email.trim() !== '' || formData.declarant_phone.trim() !== '');
   };
 
   const isStep2Valid = () => {
@@ -157,7 +141,7 @@ export default function ReportPersonPage() {
   };
 
   const isStep3Valid = () => {
-    return formData.date_disparition !== '' && formData.lieu_disparition.trim() !== '' && formData.photos.length > 0;
+    return formData.date_disparition !== '' && formData.lieu_disparition.trim() !== '' && formData.photoFiles.length > 0;
   };
 
   return (
@@ -233,22 +217,32 @@ export default function ReportPersonPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Votre contact (téléphone ou email) *
+                    Votre email
                   </label>
                   <input
-                    type="text"
-                    name="declarant_contact"
-                    value={formData.declarant_contact}
+                    type="email"
+                    name="declarant_email"
+                    value={formData.declarant_email}
                     onChange={handleChange}
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="Ex: +228 XX XX XX XX ou email@example.com"
-                    required
+                    placeholder="email@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Votre téléphone
+                  </label>
+                  <PhoneInput
+                    value={formData.declarant_phone}
+                    onChange={(val) => setFormData({ ...formData, declarant_phone: val || '' })}
+                    placeholder="Numéro de téléphone"
                   />
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-800">
-                    <strong>Note:</strong> Ces informations nous permettront de vous contacter si nécessaire.
+                    <strong>Note:</strong> Au moins un moyen de contact (email ou téléphone) est requis.
                   </p>
                 </div>
               </div>
@@ -368,20 +362,15 @@ export default function ReportPersonPage() {
                       accept="image/*"
                       multiple
                       onChange={handlePhotoUpload}
-                      disabled={uploadingPhotos}
                       className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
                     />
                     
-                    {uploadingPhotos && (
-                      <p className="text-sm text-blue-600">Upload en cours...</p>
-                    )}
-                    
-                    {formData.photos.length > 0 && (
+                    {formData.photoFiles.length > 0 && (
                       <div className="grid grid-cols-3 gap-3">
-                        {formData.photos.map((url, index) => (
+                        {formData.photoFiles.map((file, index) => (
                           <div key={index} className="relative group">
                             <img
-                              src={`${API_BASE_URL}${url}`}
+                              src={URL.createObjectURL(file)}
                               alt={`Photo ${index + 1}`}
                               className="w-full h-24 object-cover rounded-lg border"
                             />
@@ -397,7 +386,7 @@ export default function ReportPersonPage() {
                       </div>
                     )}
                     
-                    {formData.photos.length === 0 && (
+                    {formData.photoFiles.length === 0 && (
                       <div className="border-2 border-dashed border-red-300 rounded-lg p-4 text-center bg-red-50">
                         <p className="text-sm text-red-600">
                           ⚠️ Au moins une photo est obligatoire
@@ -414,8 +403,8 @@ export default function ReportPersonPage() {
                     <p><strong>Personne:</strong> {formData.prenoms} {formData.nom}, {formData.age}</p>
                     <p><strong>Disparu(e) le:</strong> {formData.date_disparition || '(Non renseigné)'}</p>
                     <p><strong>Lieu:</strong> {formData.lieu_disparition || '(Non renseigné)'}</p>
-                    <p><strong>Photos:</strong> {formData.photos.length} photo(s) uploadée(s)</p>
-                    <p><strong>Déclarant:</strong> {formData.declarant_nom} ({formData.declarant_contact})</p>
+                    <p><strong>Photos:</strong> {formData.photoFiles.length} photo(s) uploadée(s)</p>
+                    <p><strong>Déclarant:</strong> {formData.declarant_nom} ({formData.declarant_email || formData.declarant_phone})</p>
                   </div>
                 </div>
               </div>
@@ -458,10 +447,10 @@ export default function ReportPersonPage() {
               ) : (
                 <button
                   type="submit"
-                  disabled={isSubmitting || !isStep3Valid() || uploadingPhotos}
+                  disabled={isSubmitting || !isStep3Valid()}
                   className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all"
                 >
-                  {isSubmitting ? 'Envoi en cours...' : uploadingPhotos ? 'Upload photos...' : '✓ Envoyer le signalement'}
+                  {isSubmitting ? 'Envoi en cours...' : '✓ Envoyer le signalement'}
                 </button>
               )}
             </div>

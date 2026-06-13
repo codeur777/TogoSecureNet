@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
@@ -20,7 +20,8 @@ router = APIRouter()
 
 class SignalementCreate(BaseModel):
     declarant_nom: str
-    declarant_contact: str
+    declarant_email: Optional[str] = None
+    declarant_phone: Optional[str] = None
     type_signalement: str  # "personne_disparue" ou "engin_vole"
 
 class PersonneDisparuePublic(BaseModel):
@@ -47,16 +48,212 @@ class EnginVolePublic(BaseModel):
 
 class SignalementResponse(BaseModel):
     id: str
-    numero_suivi: str
+    numero_suivi: Optional[str] = None
     declarant_nom: str
-    declarant_contact: str
+    declarant_email: Optional[str] = None
+    declarant_phone: Optional[str] = None
     type_signalement: str
     statut: str
+    date_declaration: datetime
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
 
-# ── Routes Publiques (sans authentification) ───────────────────────────────────
+@router.post("/personne-complete", status_code=201)
+def create_personne_complete(
+    declarant_nom: str = Form(...),
+    declarant_email: Optional[str] = Form(None),
+    declarant_phone: Optional[str] = Form(None),
+    nom: str = Form(...),
+    prenoms: str = Form(...),
+    age: str = Form(...),
+    date_disparition: date = Form(...),
+    lieu_disparition: str = Form(...),
+    description: Optional[str] = Form(None),
+    photos: List[UploadFile] = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Route publique ATOMIQUE pour créer un signalement de personne disparue complet.
+    Tout est créé en une seule transaction.
+    """
+    from app.utils.phone_utils import validate_phone_number
+    import uuid
+    import os
+    
+    # Valider qu'au moins un contact est fourni
+    if not declarant_email and not declarant_phone:
+        raise HTTPException(400, "Email ou téléphone requis")
+    
+    # Valider le téléphone si fourni
+    if declarant_phone:
+        is_valid, result = validate_phone_number(declarant_phone)
+        if not is_valid:
+            raise HTTPException(400, f"Téléphone invalide: {result}")
+        declarant_phone = result
+    
+    # Vérifier qu'au moins une photo est fournie
+    if not photos or len(photos) == 0:
+        raise HTTPException(400, "Au moins une photo est requise")
+    
+    try:
+        # Upload des photos
+        os.makedirs("uploads/signalements", exist_ok=True)
+        photo_urls = []
+        
+        for photo in photos:
+            ext = photo.filename.split('.')[-1] if '.' in photo.filename else 'jpg'
+            filename = f"{uuid.uuid4()}.{ext}"
+            filepath = f"uploads/signalements/{filename}"
+            
+            with open(filepath, "wb") as buffer:
+                shutil.copyfileobj(photo.file, buffer)
+            
+            photo_urls.append(f"/static/signalements/{filename}")
+        
+        # Transaction atomique
+        numero_suivi = Signalement.generer_numero_suivi()
+        
+        # Créer signalement
+        signalement = Signalement(
+            numero_suivi=numero_suivi,
+            declarant_nom=declarant_nom,
+            declarant_email=declarant_email,
+            declarant_phone=declarant_phone,
+            type_signalement=TypeSignalementEnum.PERSONNE_DISPARUE,
+            statut=StatutSignalementEnum.EN_ATTENTE
+        )
+        db.add(signalement)
+        db.flush()  # Pour obtenir l'ID
+        
+        # Créer personne disparue
+        personne = PersonneDisparue(
+            nom=nom,
+            prenoms=prenoms,
+            age=age,
+            date_disparition=date_disparition,
+            lieu_disparition=lieu_disparition,
+            description=description,
+            niveau_gravite=NiveauGraviteEnum.GRAVE,
+            signalement_id=signalement.id,
+            photo=photo_urls
+        )
+        db.add(personne)
+        db.commit()
+        
+        # Notifier admin/superviseurs
+        _notify_new_signalement(db, signalement, personne)
+        
+        return {
+            "message": "Signalement enregistré avec succès",
+            "numero_suivi": numero_suivi,
+            "signalement_id": signalement.id,
+            "personne_id": personne.id
+        }
+        
+    except Exception as e:
+        db.rollback()
+        # Nettoyer les photos uploadées en cas d'erreur
+        for url in photo_urls:
+            try:
+                filepath = f"uploads/signalements/{url.split('/')[-1]}"
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+            except:
+                pass
+        raise HTTPException(500, f"Erreur lors de l'enregistrement: {str(e)}")
+
+
+@router.post("/engin-complete", status_code=201)
+def create_engin_complete(
+    declarant_nom: str = Form(...),
+    declarant_email: Optional[str] = Form(None),
+    declarant_phone: Optional[str] = Form(None),
+    type_engin: str = Form(...),
+    marque: str = Form(...),
+    modele: str = Form(...),
+    plaque_immatriculation: str = Form(...),
+    couleur: Optional[str] = Form(None),
+    date_vol: date = Form(...),
+    lieu_vol: Optional[str] = Form(None),
+    circonstances: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Route publique ATOMIQUE pour créer un signalement d'engin volé complet.
+    Tout est créé en une seule transaction.
+    """
+    from app.utils.phone_utils import validate_phone_number
+    
+    # Valider qu'au moins un contact est fourni
+    if not declarant_email and not declarant_phone:
+        raise HTTPException(400, "Email ou téléphone requis")
+    
+    # Valider le téléphone si fourni
+    if declarant_phone:
+        is_valid, result = validate_phone_number(declarant_phone)
+        if not is_valid:
+            raise HTTPException(400, f"Téléphone invalide: {result}")
+        declarant_phone = result
+    
+    # Vérifier que la plaque n'existe pas déjà
+    existing = db.query(EnginVole).filter(
+        EnginVole.plaque_immatriculation == plaque_immatriculation.upper()
+    ).first()
+    
+    if existing:
+        raise HTTPException(400, "Un signalement existe déjà pour cette plaque")
+    
+    try:
+        # Transaction atomique
+        numero_suivi = Signalement.generer_numero_suivi()
+        
+        # Créer signalement
+        signalement = Signalement(
+            numero_suivi=numero_suivi,
+            declarant_nom=declarant_nom,
+            declarant_email=declarant_email,
+            declarant_phone=declarant_phone,
+            type_signalement=TypeSignalementEnum.ENGIN_VOLE,
+            statut=StatutSignalementEnum.EN_ATTENTE
+        )
+        db.add(signalement)
+        db.flush()
+        
+        # Créer engin volé
+        engin = EnginVole(
+            type_engin=type_engin,
+            marque=marque,
+            modele=modele,
+            couleur=couleur,
+            plaque_immatriculation=plaque_immatriculation.upper(),
+            date_vol=date_vol,
+            lieu_vol=lieu_vol,
+            circonstances=circonstances,
+            signalement_id=signalement.id
+        )
+        db.add(engin)
+        db.commit()
+        
+        # Notifier admin/superviseurs
+        _notify_new_signalement(db, signalement, engin)
+        
+        return {
+            "message": "Signalement enregistré avec succès",
+            "numero_suivi": numero_suivi,
+            "signalement_id": signalement.id,
+            "engin_id": engin.id
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Erreur lors de l'enregistrement: {str(e)}")
+
+
+# ── Routes Publiques (ANCIENNES - garder pour compatibilité) ──────────────────
 
 @router.post("/", response_model=SignalementResponse, status_code=201)
 def create_signalement(
@@ -64,13 +261,27 @@ def create_signalement(
     db: Session = Depends(get_db)
 ):
     """Route publique pour créer un signalement"""
+    from app.utils.phone_utils import validate_phone_number
+    
+    # Valider qu'au moins un moyen de contact est fourni
+    if not data.declarant_email and not data.declarant_phone:
+        raise HTTPException(400, "Email ou téléphone requis")
+    
+    # Valider le téléphone si fourni
+    if data.declarant_phone:
+        is_valid, result = validate_phone_number(data.declarant_phone)
+        if not is_valid:
+            raise HTTPException(400, f"Téléphone invalide: {result}")
+        data.declarant_phone = result  # Format E164
+    
     # Générer numéro de suivi unique
     numero_suivi = Signalement.generer_numero_suivi()
     
     signalement = Signalement(
         numero_suivi=numero_suivi,
         declarant_nom=data.declarant_nom,
-        declarant_contact=data.declarant_contact,
+        declarant_email=data.declarant_email,
+        declarant_phone=data.declarant_phone,
         type_signalement=TypeSignalementEnum(data.type_signalement),
         statut=StatutSignalementEnum.EN_ATTENTE
     )
@@ -196,13 +407,33 @@ def create_engin_vole_public(
 
 # ── Routes Protégées (avec authentification) ───────────────────────────────────
 
+@router.get("/mes-signalements", response_model=List[SignalementResponse])
+def get_mes_signalements(
+    statut: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Récupère les signalements du citoyen connecté"""
+    from app.services.signalement_service import get_user_signalements
+    
+    signalements = get_user_signalements(db, current_user.id, statut)
+    return signalements
+
+
 @router.get("/", response_model=List[SignalementResponse])
 def get_signalements(
     statut: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Liste des signalements (admin/superviseur)"""
+    """Liste des signalements (admin/superviseur) ou mes signalements (citoyen)"""
+    # Si citoyen, retourner uniquement ses signalements
+    if current_user.role == "citoyen":
+        from app.services.signalement_service import get_user_signalements
+        signalements = get_user_signalements(db, current_user.id, statut)
+        return signalements
+    
+    # Si admin/superviseur, retourner tous les signalements
     if current_user.role not in ["admin", "superviseur"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
     
@@ -233,8 +464,10 @@ def get_signalement_details(
     # Retourner avec les détails selon le type
     result = {
         "id": signalement.id,
+        "numero_suivi": signalement.numero_suivi,
         "declarant_nom": signalement.declarant_nom,
-        "declarant_contact": signalement.declarant_contact,
+        "declarant_email": signalement.declarant_email,
+        "declarant_phone": signalement.declarant_phone,
         "type_signalement": signalement.type_signalement.value,
         "statut": signalement.statut.value,
         "date_declaration": signalement.date_declaration.isoformat(),
@@ -279,8 +512,19 @@ def valider_signalement(
     signalement.validateur_id = current_user.id
     db.commit()
     
-    # TODO: Notifier le citoyen de la validation
-    # TODO: Extraire les vecteurs biométriques via IA (si personne disparue)
+    # Notifier le citoyen de la validation
+    try:
+        if signalement.user_id:
+            from app.models.notification import Notification
+            notification = Notification(
+                utilisateur_id=signalement.user_id,
+                titre="Signalement validé",
+                message=f"Votre signalement {signalement.numero_suivi} a été validé par nos équipes. Il est maintenant actif dans notre système de surveillance."
+            )
+            db.add(notification)
+            db.commit()
+    except Exception as e:
+        print(f"[ERREUR NOTIFICATION] {str(e)}")
     
     return {"message": "Signalement validé", "numero_suivi": signalement.numero_suivi}
 
@@ -306,7 +550,19 @@ def rejeter_signalement(
         signalement.motif_rejet = motif
     db.commit()
     
-    # TODO: Notifier le citoyen du rejet
+    # Notifier le citoyen du rejet
+    try:
+        if signalement.user_id:
+            from app.models.notification import Notification
+            notification = Notification(
+                utilisateur_id=signalement.user_id,
+                titre="Signalement rejeté",
+                message=f"Votre signalement {signalement.numero_suivi} a été rejeté. Motif: {motif or 'Non précisé'}"
+            )
+            db.add(notification)
+            db.commit()
+    except Exception as e:
+        print(f"[ERREUR NOTIFICATION] {str(e)}")
     
     return {"message": "Signalement rejeté"}
 

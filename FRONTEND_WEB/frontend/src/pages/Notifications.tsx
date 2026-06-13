@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import PageMeta from "../components/common/PageMeta";
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import api from "../services/api";
+import toast from "react-hot-toast";
 
 interface Notification {
   id: string;
@@ -24,13 +23,12 @@ const Notifications = () => {
   const loadNotifications = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/notifications/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setNotifications(response.data);
+      const response = await api.get("/api/v1/notifications/");
+      setNotifications(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Erreur:', error);
+      toast.error("Erreur lors du chargement des notifications");
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -38,13 +36,12 @@ const Notifications = () => {
 
   const marquerCommeLu = async (id: string) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.patch(`${API_BASE_URL}/notifications/${id}/lire`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.patch(`/api/v1/notifications/${id}/lire`);
       setNotifications(notifications.map(n => n.id === id ? { ...n, lu: true } : n));
+      toast.success("Notification marquée comme lue");
     } catch (error) {
       console.error('Erreur:', error);
+      toast.error("Erreur lors de la mise à jour");
     }
   };
 

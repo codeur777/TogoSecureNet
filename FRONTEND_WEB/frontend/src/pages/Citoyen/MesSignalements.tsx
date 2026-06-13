@@ -1,51 +1,59 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import PageMeta from "../../components/common/PageMeta";
+import api from "../../services/api";
+import toast from "react-hot-toast";
 
 interface Signalement {
-  id: number;
-  type: 'personne' | 'engin';
-  titre: string;
-  description: string;
-  dateSignalement: string;
+  id: string;
+  type: 'personne_disparue' | 'engin_vole';
+  titre?: string;
+  description?: string;
+  created_at: string;
   statut: 'en_attente' | 'examine' | 'valide' | 'rejete' | 'clos';
-  commentaireAdmin?: string;
+  commentaire_admin?: string;
+  nom?: string;
+  prenoms?: string;
+  marque?: string;
+  modele?: string;
 }
 
 const MesSignalements = () => {
-  const [signalements] = useState<Signalement[]>([
-    {
-      id: 1,
-      type: "personne",
-      titre: "Disparition de mon fils Jean",
-      description: "Mon fils de 15 ans a disparu depuis hier soir. Il porte un t-shirt bleu.",
-      dateSignalement: "2024-01-20T14:30:00",
-      statut: "valide",
-      commentaireAdmin: "Signalement validé. Recherches en cours."
-    },
-    {
-      id: 2,
-      type: "engin",
-      titre: "Vol de ma Toyota Corolla",
-      description: "Ma voiture a été volée cette nuit devant mon domicile.",
-      dateSignalement: "2024-01-19T08:00:00",
-      statut: "examine",
-      commentaireAdmin: "Dossier en cours d'examen par nos services."
-    },
-    {
-      id: 3,
-      type: "personne",
-      titre: "Ma mère égarée",
-      description: "Ma mère de 70 ans s'est égarée. Elle souffre d'Alzheimer.",
-      dateSignalement: "2024-01-18T16:00:00",
-      statut: "en_attente"
-    },
-  ]);
-
+  const [signalements, setSignalements] = useState<Signalement[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'tous' | 'en_attente' | 'examine' | 'valide' | 'rejete' | 'clos'>('tous');
+
+  const fetchSignalements = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/api/v1/signalements/");
+      setSignalements(Array.isArray(res.data) ? res.data : []);
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Erreur lors du chargement des signalements.");
+      setSignalements([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSignalements();
+  }, [fetchSignalements]);
 
   const filteredSignalements = signalements.filter(s =>
     filter === 'tous' ? true : s.statut === filter
   );
+
+  const getTitre = (s: Signalement) => {
+    if (s.titre) return s.titre;
+    if (s.type === 'personne_disparue' && s.nom && s.prenoms) {
+      return `${s.prenoms} ${s.nom}`;
+    }
+    if (s.type === 'engin_vole' && s.marque && s.modele) {
+      return `${s.marque} ${s.modele}`;
+    }
+    return `Signalement #${s.id}`;
+  };
 
   const getStatutBadge = (statut: string) => {
     const badges = {
@@ -185,82 +193,96 @@ const MesSignalements = () => {
         </button>
       </div>
 
-      <div className="space-y-4">
-        {filteredSignalements.map((signalement) => (
-          <div
-            key={signalement.id}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition"
-          >
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {signalement.titre}
-                  </h3>
-                  <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
-                    signalement.type === 'personne' 
-                      ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
-                      : 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400'
-                  }`}>
-                    {signalement.type === 'personne' ? 'Personne' : 'Engin'}
+      {loading ? (
+        <div className="space-y-4">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 animate-pulse">
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mb-2"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredSignalements.map((signalement) => (
+            <div
+              key={signalement.id}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition"
+            >
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {getTitre(signalement)}
+                    </h3>
+                    <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
+                      signalement.type === 'personne_disparue' 
+                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
+                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400'
+                    }`}>
+                      {signalement.type === 'personne_disparue' ? 'Personne' : 'Engin'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    Signalé le {new Date(signalement.created_at).toLocaleDateString('fr-FR')} à{' '}
+                    {new Date(signalement.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {getStatutIcon(signalement.statut)}
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getStatutBadge(signalement.statut)}`}>
+                    {getStatutLabel(signalement.statut)}
                   </span>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  Signalé le {new Date(signalement.dateSignalement).toLocaleDateString('fr-FR')} à{' '}
-                  {new Date(signalement.dateSignalement).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+
+              {signalement.description && (
+                <p className="text-gray-700 dark:text-gray-300 mb-4">
+                  {signalement.description}
                 </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {getStatutIcon(signalement.statut)}
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getStatutBadge(signalement.statut)}`}>
-                  {getStatutLabel(signalement.statut)}
-                </span>
-              </div>
-            </div>
+              )}
 
-            <p className="text-gray-700 dark:text-gray-300 mb-4">
-              {signalement.description}
-            </p>
-
-            {signalement.commentaireAdmin && (
-              <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
-                <div className="flex items-start gap-2">
-                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  <div>
-                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-1">
-                      Commentaire de l'administrateur
-                    </p>
-                    <p className="text-sm text-blue-800 dark:text-blue-400">
-                      {signalement.commentaireAdmin}
-                    </p>
+              {signalement.commentaire_admin && (
+                <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-1">
+                        Commentaire de l'administrateur
+                      </p>
+                      <p className="text-sm text-blue-800 dark:text-blue-400">
+                        {signalement.commentaire_admin}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div className="flex gap-2">
-              <button className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition text-sm font-medium">
-                Voir détails
-              </button>
-              {canEdit(signalement.statut) && (
-                <button className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-sm font-medium">
-                  Modifier
+              <div className="flex gap-2">
+                <button className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition text-sm font-medium">
+                  Voir détails
                 </button>
-              )}
-              {signalement.statut === 'valide' && (
-                <span className="px-4 py-2 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 rounded-lg text-sm font-medium flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Validé par les autorités
-                </span>
-              )}
+                {canEdit(signalement.statut) && (
+                  <button className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-sm font-medium">
+                    Modifier
+                  </button>
+                )}
+                {signalement.statut === 'valide' && (
+                  <span className="px-4 py-2 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 rounded-lg text-sm font-medium flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Validé par les autorités
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {filteredSignalements.length === 0 && (
         <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">

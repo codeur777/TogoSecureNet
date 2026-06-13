@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import PageMeta from "../components/common/PageMeta";
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import api from "../services/api";
+import toast from "react-hot-toast";
 
 interface Signalement {
   id: string;
   numero_suivi: string;
   declarant_nom: string;
-  declarant_contact: string;
+  declarant_email?: string;
+  declarant_phone?: string;
   type_signalement: string;
   statut: string;
   date_declaration: string;
@@ -29,13 +29,12 @@ const Signalements = () => {
   const loadSignalements = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/signalements/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setSignalements(response.data);
+      const response = await api.get("/api/v1/signalements/");
+      setSignalements(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Erreur chargement:', error);
+      toast.error("Erreur lors du chargement des signalements");
+      setSignalements([]);
     } finally {
       setLoading(false);
     }
@@ -128,12 +127,13 @@ const Signalements = () => {
                   <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                     <span className="flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>{sig.declarant_nom}</span>
                     <span className="flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>{new Date(sig.date_declaration).toLocaleString('fr-FR')}</span>
-                    <span className="flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>{sig.declarant_contact}</span>
+                    {sig.declarant_email && <span className="flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>{sig.declarant_email}</span>}
+                    {sig.declarant_phone && <span className="flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>{sig.declarant_phone}</span>}
                   </div>
                 </div>
                 <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${sig.type_signalement === 'personne_disparue' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400' : 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400'}`}>{sig.type_signalement === 'personne_disparue' ? 'Personne' : 'Engin'}</span>
               </div>
-              <button onClick={() => navigate('/gestion-signalements')} className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition text-sm font-medium">Examiner</button>
+              <button onClick={() => navigate(`/gestion-signalements/${sig.id}`)} className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition text-sm font-medium">Examiner</button>
             </div>
           ))}
         </div>

@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import PhoneInput from '../../components/form/PhoneInput';
+import api from '../../services/api';
+import toast from 'react-hot-toast';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = '/api/v1';
 
 type Step = 1 | 2 | 3;
 
 interface FormData {
   // Étape 1: Informations déclarant
   declarant_nom: string;
-  declarant_contact: string;
+  declarant_email: string;
+  declarant_phone: string;
   
   // Étape 2: Informations engin
   type_engin: string;
@@ -30,7 +33,8 @@ export default function ReportVehiclePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     declarant_nom: '',
-    declarant_contact: '',
+    declarant_email: '',
+    declarant_phone: '',
     type_engin: 'voiture',
     marque: '',
     modele: '',
@@ -65,40 +69,39 @@ export default function ReportVehiclePage() {
     setIsSubmitting(true);
 
     try {
-      // Créer le signalement
-      const signalementResponse = await axios.post(`${API_BASE_URL}/signalements/`, {
-        declarant_nom: formData.declarant_nom,
-        declarant_contact: formData.declarant_contact,
-        type_signalement: 'engin_vole',
+      // Créer FormData pour l'API atomique
+      const submitData = new FormData();
+      submitData.append('declarant_nom', formData.declarant_nom);
+      if (formData.declarant_email) submitData.append('declarant_email', formData.declarant_email);
+      if (formData.declarant_phone) submitData.append('declarant_phone', formData.declarant_phone);
+      submitData.append('type_engin', formData.type_engin);
+      submitData.append('marque', formData.marque);
+      submitData.append('modele', formData.modele);
+      submitData.append('plaque_immatriculation', formData.plaque_immatriculation);
+      if (formData.couleur) submitData.append('couleur', formData.couleur);
+      submitData.append('date_vol', formData.date_vol);
+      if (formData.lieu_vol) submitData.append('lieu_vol', formData.lieu_vol);
+      if (formData.circonstances) submitData.append('circonstances', formData.circonstances);
+
+      const response = await api.post(`${API_BASE_URL}/signalements/engin-complete`, submitData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      const signalementId = signalementResponse.data.id;
-
-      // Créer l'engin volé (endpoint public)
-      await axios.post(`${API_BASE_URL}/signalements/engin`, {
-        signalement_id: signalementId,
-        type_engin: formData.type_engin,
-        marque: formData.marque,
-        modele: formData.modele,
-        couleur: formData.couleur,
-        plaque_immatriculation: formData.plaque_immatriculation,
-        date_vol: formData.date_vol,
-        lieu_vol: formData.lieu_vol,
-        circonstances: formData.circonstances,
+      toast.success(`Signalement enregistré!\nNuméro de suivi: ${response.data.numero_suivi}`, { 
+        duration: 6000 
       });
-
-      alert('Signalement enregistré avec succès ! Un superviseur sera notifié.');
-      navigate('/');
+      setTimeout(() => navigate('/'), 2000);
     } catch (error: any) {
       console.error('Erreur:', error);
-      alert(error.response?.data?.detail || 'Erreur lors de l\'enregistrement');
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'enregistrement');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const isStep1Valid = () => {
-    return formData.declarant_nom.trim() !== '' && formData.declarant_contact.trim() !== '';
+    return formData.declarant_nom.trim() !== '' && 
+           (formData.declarant_email.trim() !== '' || formData.declarant_phone.trim() !== '');
   };
 
   const isStep2Valid = () => {
@@ -186,22 +189,32 @@ export default function ReportVehiclePage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Votre contact (téléphone ou email) *
+                    Votre email
                   </label>
                   <input
-                    type="text"
-                    name="declarant_contact"
-                    value={formData.declarant_contact}
+                    type="email"
+                    name="declarant_email"
+                    value={formData.declarant_email}
                     onChange={handleChange}
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Ex: +228 XX XX XX XX ou email@example.com"
-                    required
+                    placeholder="email@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Votre téléphone
+                  </label>
+                  <PhoneInput
+                    value={formData.declarant_phone}
+                    onChange={(val) => setFormData({ ...formData, declarant_phone: val || '' })}
+                    placeholder="Numéro de téléphone"
                   />
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-800">
-                    <strong>Note:</strong> Assurez-vous d'être le propriétaire légitime ou ayant-droit du véhicule.
+                    <strong>Note:</strong> Assurez-vous d'être le propriétaire légitime ou ayant-droit du véhicule. Au moins un moyen de contact est requis.
                   </p>
                 </div>
               </div>

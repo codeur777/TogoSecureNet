@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.api import (
     auth, persons, cameras, alerts, websocket, dashboard, 
     users, audit, portrait_robot, signalements, personnes_disparues,
-    engins_voles, detections, alertes
+    engins_voles, detections, alertes, notifications
 )
 from app.mqtt_client import start_mqtt
 from contextlib import asynccontextmanager
@@ -52,6 +52,7 @@ app.include_router(personnes_disparues.router, prefix="/api/v1/personnes-disparu
 app.include_router(engins_voles.router, prefix="/api/v1/engins-voles", tags=["Engins Volés"])
 app.include_router(detections.router, prefix="/api/v1/detections", tags=["Detections"])
 app.include_router(alertes.router, prefix="/api/v1/alertes", tags=["Alertes"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
 app.include_router(persons.router, prefix="/api/v1/persons", tags=["Persons (Legacy)"])
 app.include_router(cameras.router, prefix="/api/v1/cameras", tags=["Cameras"])
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts (Legacy)"])

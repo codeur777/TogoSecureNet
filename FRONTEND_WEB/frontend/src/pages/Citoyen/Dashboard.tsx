@@ -1,6 +1,170 @@
+import { useState, useEffect } from "react";
 import PageMeta from "../../components/common/PageMeta";
+import api from "../../services/api";
+import toast from "react-hot-toast";
+import { useAuth } from "../../context/AuthContext";
+
+interface Stats {
+  total_signalements: number;
+  en_attente: number;
+  valides: number;
+  notifications: number;
+}
+
+interface Notification {
+  id: string;
+  type: string;
+  titre: string;
+  message: string;
+  created_at: string;
+  lu: boolean;
+}
+
+const RecentNotifications = () => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get("/api/v1/notifications/");
+        const notifs = Array.isArray(res.data) ? res.data.slice(0, 3) : [];
+        setNotifications(notifs);
+      } catch (e: any) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'validation':
+        return 'bg-blue-500';
+      case 'retrouve':
+        return 'bg-green-500';
+      case 'information':
+        return 'bg-yellow-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  const getTypeBg = (type: string) => {
+    switch (type) {
+      case 'validation':
+        return 'bg-blue-50 dark:bg-blue-900/10';
+      case 'retrouve':
+        return 'bg-green-50 dark:bg-green-900/10';
+      case 'information':
+        return 'bg-yellow-50 dark:bg-yellow-900/10';
+      default:
+        return 'bg-gray-50 dark:bg-gray-900/10';
+    }
+  };
+
+  const getTimeAgo = (date: string) => {
+    const now = new Date();
+    const notifDate = new Date(date);
+    const diffMs = now.getTime() - notifDate.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) return `Il y a ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
+    if (diffHours > 0) return `Il y a ${diffHours} heure${diffHours > 1 ? 's' : ''}`;
+    return 'Il y a quelques minutes';
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Notifications récentes</h2>
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex gap-3 p-3 bg-gray-50 dark:bg-gray-900/10 rounded-lg animate-pulse">
+              <div className="w-9 h-9 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Notifications récentes</h2>
+      {notifications.length === 0 ? (
+        <p className="text-gray-500 dark:text-gray-400 text-center py-4">Aucune notification</p>
+      ) : (
+        <div className="space-y-4">
+          {notifications.map((notif) => (
+            <div key={notif.id} className={`flex gap-3 p-3 ${getTypeBg(notif.type)} rounded-lg`}>
+              <div className={`${getTypeIcon(notif.type)} p-2 rounded-lg h-fit`}>
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{notif.titre}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">{notif.message}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{getTimeAgo(notif.created_at)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const CitoyenDashboard = () => {
+  const { user } = useAuth();
+  const [stats, setStats] = useState<Stats>({
+    total_signalements: 0,
+    en_attente: 0,
+    valides: 0,
+    notifications: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const [signalements, notifications] = await Promise.all([
+          api.get("/api/v1/signalements/"),
+          api.get("/api/v1/notifications/")
+        ]);
+        
+        const sigs = Array.isArray(signalements.data) ? signalements.data : [];
+        const notifs = Array.isArray(notifications.data) ? notifications.data : [];
+        
+        setStats({
+          total_signalements: sigs.length,
+          en_attente: sigs.filter((s: any) => s.statut === 'en_attente').length,
+          valides: sigs.filter((s: any) => s.statut === 'valide').length,
+          notifications: notifs.length
+        });
+      } catch (e: any) {
+        console.error(e);
+        toast.error("Erreur lors du chargement des statistiques.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
   return (
     <>
       <PageMeta
@@ -26,7 +190,9 @@ const CitoyenDashboard = () => {
               </svg>
             </div>
           </div>
-          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">3</h3>
+          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+            {loading ? "..." : stats.total_signalements}
+          </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">Mes signalements</p>
         </div>
 
@@ -38,7 +204,9 @@ const CitoyenDashboard = () => {
               </svg>
             </div>
           </div>
-          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">1</h3>
+          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+            {loading ? "..." : stats.en_attente}
+          </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">En attente</p>
         </div>
 
@@ -50,7 +218,9 @@ const CitoyenDashboard = () => {
               </svg>
             </div>
           </div>
-          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">2</h3>
+          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+            {loading ? "..." : stats.valides}
+          </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">Validés</p>
         </div>
 
@@ -62,7 +232,9 @@ const CitoyenDashboard = () => {
               </svg>
             </div>
           </div>
-          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">5</h3>
+          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+            {loading ? "..." : stats.notifications}
+          </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">Notifications</p>
         </div>
       </div>
@@ -118,55 +290,7 @@ const CitoyenDashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Notifications récentes</h2>
-          <div className="space-y-4">
-            <div className="flex gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg">
-              <div className="bg-blue-500 p-2 rounded-lg h-fit">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">Signalement validé</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Votre signalement #123 a été validé par les autorités
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Il y a 2 heures</p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 p-3 bg-green-50 dark:bg-green-900/10 rounded-lg">
-              <div className="bg-green-500 p-2 rounded-lg h-fit">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">Personne retrouvée</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  La personne de votre signalement #120 a été retrouvée
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Il y a 1 jour</p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/10 rounded-lg">
-              <div className="bg-yellow-500 p-2 rounded-lg h-fit">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">Information manquante</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Complétez les informations de votre signalement #124
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Il y a 2 jours</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <RecentNotifications />
       </div>
 
       <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-2xl p-8 text-white">

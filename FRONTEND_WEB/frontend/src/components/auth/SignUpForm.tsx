@@ -4,6 +4,7 @@ import { EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
+import PhoneInput from "../form/PhoneInput";
 import api from "../../services/api";
 import toast from "react-hot-toast";
 
@@ -15,6 +16,7 @@ export default function SignUpForm() {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<Step>("form");
   const [otp, setOtp] = useState("");
+  const [signalementInfo, setSignalementInfo] = useState<{ count: number; message: string } | null>(null);
   const navigate = useNavigate();
   
   const [formData, setFormData] = useState({
@@ -35,10 +37,19 @@ export default function SignUpForm() {
 
     setLoading(true);
     try {
-      await api.post("/api/v1/auth/signup", {
+      const response = await api.post("/api/v1/auth/signup", {
         ...formData,
         role: "citoyen"
       });
+      
+      // Vérifier s'il y a des signalements trouvés
+      if (response.data.found_signalements && response.data.found_signalements > 0) {
+        setSignalementInfo({
+          count: response.data.found_signalements,
+          message: response.data.info_message
+        });
+      }
+      
       toast.success("Code de vérification envoyé !");
       setStep("otp");
     } catch (err: any) {
@@ -52,11 +63,18 @@ export default function SignUpForm() {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post("/api/v1/auth/signup/verify", {
+      const response = await api.post("/api/v1/auth/signup/verify", {
         email: formData.email,
         otp
       });
-      toast.success("Compte créé ! Connectez-vous.");
+      
+      // Message de succès avec info sur les signalements rattachés
+      if (response.data.signalements_linked && response.data.signalements_linked > 0) {
+        toast.success(response.data.info_message || "Compte créé avec succès !");
+      } else {
+        toast.success("Compte créé ! Connectez-vous.");
+      }
+      
       navigate("/signin");
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Code invalide");
@@ -76,6 +94,24 @@ export default function SignUpForm() {
             Code envoyé à <strong>{formData.email}</strong>
           </p>
         </div>
+
+        {signalementInfo && (
+          <div className="mb-5 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-1">
+                  Signalements trouvés
+                </p>
+                <p className="text-sm text-blue-800 dark:text-blue-400">
+                  {signalementInfo.message}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         
         <form onSubmit={handleOtpSubmit}>
           <div className="space-y-5">
@@ -173,6 +209,19 @@ export default function SignUpForm() {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               placeholder="Entrez votre e-mail"
               required
+            />
+          </div>
+
+          {/* Téléphone */}
+          <div>
+            <Label>
+              Téléphone<span className="text-error-500">*</span>
+            </Label>
+            <PhoneInput
+              value={formData.phone}
+              onChange={(val) => setFormData({ ...formData, phone: val || "" })}
+              required
+              placeholder="Numéro de téléphone"
             />
           </div>
           
