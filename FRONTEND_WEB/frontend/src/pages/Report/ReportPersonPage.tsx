@@ -49,7 +49,7 @@ export default function ReportPersonPage() {
 
   // Charger les données existantes si mode édition
   useEffect(() => {
-    if (editId) {
+    if (editId && !isEditMode && !isLoading) {
       loadSignalementData(editId);
     }
   }, [editId]);
@@ -89,6 +89,7 @@ export default function ReportPersonPage() {
       });
 
       setIsEditMode(true);
+      setCurrentStep(1); // Toujours commencer à l'étape 1 en mode édition
       toast.success('Données chargées. Vous pouvez modifier le signalement.');
     } catch (error: any) {
       console.error(error);
@@ -141,8 +142,9 @@ export default function ReportPersonPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Filet de sécurité — ne jamais soumettre avant l'étape 3
     if (currentStep !== 3) {
-      toast.error('Veuillez compléter toutes les étapes');
+      e.stopPropagation();
       return;
     }
 
@@ -535,7 +537,11 @@ export default function ReportPersonPage() {
               {currentStep < 3 ? (
                 <button
                   type="button"
-                  onClick={nextStep}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    nextStep();
+                  }}
                   disabled={
                     (currentStep === 1 && !isStep1Valid()) ||
                     (currentStep === 2 && !isStep2Valid())
