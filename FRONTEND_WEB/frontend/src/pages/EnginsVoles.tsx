@@ -9,8 +9,9 @@ interface EnginVole {
   marque: string;
   modele: string;
   plaque_immatriculation: string;
-  couleur: string;
+  couleur?: string;
   date_vol: string;
+  lieu_vol?: string;
   statut: "recherche" | "retrouve" | "clos";
 }
 
@@ -73,7 +74,8 @@ const EnginsVoles = () => {
     const matchType = typeFilter === "tous" || e.type_engin?.toLowerCase() === typeFilter;
     const matchSearch = !search ||
       `${e.marque} ${e.modele}`.toLowerCase().includes(search.toLowerCase()) ||
-      e.plaque_immatriculation?.toLowerCase().includes(search.toLowerCase());
+      e.plaque_immatriculation?.toLowerCase().includes(search.toLowerCase()) ||
+      e.lieu_vol?.toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchType && matchSearch;
   });
 

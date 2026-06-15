@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PhoneInput from '../../components/form/PhoneInput';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -29,8 +29,12 @@ interface FormData {
 
 export default function ReportVehiclePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  const [isEditMode, setIsEditMode] = useState(false);
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     declarant_nom: '',
     declarant_email: '',
@@ -44,6 +48,59 @@ export default function ReportVehiclePage() {
     lieu_vol: '',
     circonstances: '',
   });
+
+  // Charger les données existantes si mode édition
+  useEffect(() => {
+    if (editId) {
+      loadSignalementData(editId);
+    }
+  }, [editId]);
+
+  const loadSignalementData = async (id: string) => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(`/api/v1/signalements/${id}`);
+      const data = res.data;
+
+      // Vérifier que c'est bien un engin volé
+      if (data.type_signalement !== 'engin_vole') {
+        toast.error('Ce signalement n\'est pas un engin volé');
+        navigate('/mes-signalements');
+        return;
+      }
+
+      // Vérifier que le statut permet la modification
+      if (data.statut !== 'en_attente') {
+        toast.error('Ce signalement ne peut plus être modifié (déjà examiné)');
+        navigate('/mes-signalements');
+        return;
+      }
+
+      // Remplir le formulaire avec les données existantes
+      setFormData({
+        declarant_nom: data.declarant_nom || '',
+        declarant_email: data.declarant_email || '',
+        declarant_phone: data.declarant_phone || '',
+        type_engin: data.engin?.type_engin || 'voiture',
+        marque: data.engin?.marque || '',
+        modele: data.engin?.modele || '',
+        couleur: data.engin?.couleur || '',
+        plaque_immatriculation: data.engin?.plaque_immatriculation || '',
+        date_vol: data.engin?.date_vol?.split('T')[0] || '',
+        lieu_vol: data.engin?.lieu_vol || '',
+        circonstances: data.engin?.circonstances || '',
+      });
+
+      setIsEditMode(true);
+      toast.success('Données chargées. Vous pouvez modifier le signalement.');
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Erreur lors du chargement du signalement');
+      navigate('/mes-signalements');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({
@@ -69,7 +126,6 @@ export default function ReportVehiclePage() {
     setIsSubmitting(true);
 
     try {
-      // Créer FormData pour l'API atomique
       const submitData = new FormData();
       submitData.append('declarant_nom', formData.declarant_nom);
       if (formData.declarant_email) submitData.append('declarant_email', formData.declarant_email);
@@ -83,14 +139,25 @@ export default function ReportVehiclePage() {
       if (formData.lieu_vol) submitData.append('lieu_vol', formData.lieu_vol);
       if (formData.circonstances) submitData.append('circonstances', formData.circonstances);
 
-      const response = await api.post(`${API_BASE_URL}/signalements/engin-complete`, submitData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      if (isEditMode && editId) {
+        // Mode édition
+        await api.put(`${API_BASE_URL}/signalements/${editId}/update-engin`, submitData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
 
-      toast.success(`Signalement enregistré!\nNuméro de suivi: ${response.data.numero_suivi}`, { 
-        duration: 6000 
-      });
-      setTimeout(() => navigate('/'), 2000);
+        toast.success('Signalement modifié avec succès!', { duration: 4000 });
+        setTimeout(() => navigate('/mes-signalements'), 1500);
+      } else {
+        // Mode création
+        const response = await api.post(`${API_BASE_URL}/signalements/engin-complete`, submitData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        toast.success(`Signalement enregistré!\nNuméro de suivi: ${response.data.numero_suivi}`, { 
+          duration: 6000 
+        });
+        setTimeout(() => navigate('/'), 2000);
+      }
     } catch (error: any) {
       console.error('Erreur:', error);
       toast.error(error.response?.data?.detail || 'Erreur lors de l\'enregistrement');
@@ -116,17 +183,33 @@ export default function ReportVehiclePage() {
     return formData.date_vol !== '' && formData.lieu_vol.trim() !== '';
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 py-12 px-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement des données...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 py-12 px-4">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Signalement d'Engin Volé
+            {isEditMode ? 'Modifier le Signalement' : 'Signalement d\'Engin Volé'}
           </h1>
           <p className="text-gray-600">
-            Déclarez le vol de votre véhicule ou engin
+            {isEditMode ? 'Modifiez les informations de votre signalement' : 'Déclarez le vol de votre véhicule ou engin'}
           </p>
+          {isEditMode && (
+            <div className="mt-3 inline-block bg-blue-100 text-blue-800 px-4 py-2 rounded-lg text-sm">
+              ℹ️ Mode édition - Vous pouvez modifier les informations
+            </div>
+          )}
         </div>
 
         {/* Progress Bar */}
@@ -421,7 +504,7 @@ export default function ReportVehiclePage() {
                   disabled={isSubmitting || !isStep3Valid()}
                   className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 transition-all"
                 >
-                  {isSubmitting ? 'Envoi en cours...' : 'Envoyer le signalement'}
+                  {isSubmitting ? 'Envoi en cours...' : (isEditMode ? '✓ Enregistrer les modifications' : 'Envoyer le signalement')}
                 </button>
               )}
             </div>

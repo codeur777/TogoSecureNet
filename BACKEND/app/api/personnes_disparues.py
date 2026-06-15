@@ -123,13 +123,38 @@ def extraire_vecteurs_faciaux(
     if not personne.photo or len(personne.photo) == 0:
         raise HTTPException(status_code=400, detail="Aucune photo disponible")
     
-    # TODO: Intégrer avec service d'extraction de vecteurs faciaux (IA)
-    # Pour l'instant, on simule l'extraction
-    import json
-    personne.vecteur_facial = json.dumps({"extracted": True, "photos_count": len(personne.photo)})
-    db.commit()
+    # Extraire les vecteurs faciaux via le service
+    from app.services.face_extraction import extract_embeddings_for_person
     
-    return {
-        "message": "Vecteurs faciaux extraits avec succès",
-        "photos_traitees": len(personne.photo)
-    }
+    try:
+        embeddings_json = extract_embeddings_for_person(personne.photo)
+        
+        if embeddings_json is None:
+            raise HTTPException(
+                status_code=400, 
+                detail="Impossible d'extraire les vecteurs faciaux. Vérifiez que les photos contiennent des visages clairs."
+            )
+        
+        # Sauvegarder dans la base de données
+        personne.vecteur_facial = embeddings_json
+        db.commit()
+        
+        import json
+        result = json.loads(embeddings_json)
+        
+        return {
+            "message": "Vecteurs faciaux extraits avec succès",
+            "photos_traitees": result["total_photos"],
+            "extractions_reussies": result["successful_extractions"],
+            "modele": result["model"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"[ERREUR] Extraction vecteurs: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de l'extraction des vecteurs faciaux: {str(e)}"
+        )

@@ -23,7 +23,8 @@ interface Signalement {
     description?: string;
     niveau_gravite: string;
     photo: string[];
-    vecteur_facial?: any;
+    vecteur_facial?: number[];
+    has_embeddings?: boolean;
   };
   engin?: {
     id: string;
@@ -76,8 +77,8 @@ export default function GestionSignalements() {
     
     setExtractingVectors(true);
     try {
-      await api.post(`/api/v1/personnes-disparues/${signalement.personne.id}/extraire-vecteurs`);
-      toast.success("Vecteurs faciaux extraits avec succès");
+      await api.post(`/api/v1/signalements/${signalement.id}/extraire-vecteurs`);
+      toast.success("Vecteurs faciaux extraits avec succes");
       loadSignalement();
     } catch (error: any) {
       toast.error(error.response?.data?.detail || "Erreur lors de l'extraction");
@@ -89,7 +90,7 @@ export default function GestionSignalements() {
   const valider = async () => {
     if (!signalement) return;
 
-    if (signalement.personne && !signalement.personne.vecteur_facial) {
+    if (signalement.personne && !(signalement.personne.has_embeddings || (signalement.personne.vecteur_facial && signalement.personne.vecteur_facial.length > 0))) {
       toast.error("Veuillez d'abord extraire les vecteurs faciaux");
       return;
     }
@@ -277,11 +278,11 @@ export default function GestionSignalements() {
                       Extraction des vecteurs faciaux
                     </h3>
                     <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
-                      {signalement.personne.vecteur_facial
-                        ? "Les vecteurs faciaux ont été extraits. Vous pouvez valider le signalement."
+                      {signalement.personne.has_embeddings || (signalement.personne.vecteur_facial && signalement.personne.vecteur_facial.length > 0)
+                        ? "Les vecteurs faciaux ont ete extraits. Vous pouvez valider le signalement."
                         : "Pour valider ce signalement, vous devez d'abord extraire les vecteurs faciaux des photos."}
                     </p>
-                    {!signalement.personne.vecteur_facial && (
+                    {!(signalement.personne.has_embeddings || (signalement.personne.vecteur_facial && signalement.personne.vecteur_facial.length > 0)) && (
                       <button
                         onClick={extractVecteurs}
                         disabled={extractingVectors}

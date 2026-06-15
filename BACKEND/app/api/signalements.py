@@ -431,7 +431,17 @@ def get_signalements(
     if current_user.role == "citoyen":
         from app.services.signalement_service import get_user_signalements
         signalements = get_user_signalements(db, current_user.id, statut)
-        return signalements
+        # Sérialiser correctement pour les citoyens
+        return [{
+            "id": s.id,
+            "numero_suivi": s.numero_suivi or "",
+            "declarant_nom": s.declarant_nom,
+            "declarant_email": s.declarant_email or "",
+            "declarant_phone": s.declarant_phone or "",
+            "type_signalement": s.type_signalement.value,
+            "statut": s.statut.value,
+            "date_declaration": s.date_declaration.isoformat()
+        } for s in signalements]
     
     # Si admin/superviseur, retourner tous les signalements
     if current_user.role not in ["admin", "superviseur"]:
@@ -443,7 +453,18 @@ def get_signalements(
         query = query.filter(Signalement.statut == StatutSignalementEnum(statut))
     
     signalements = query.order_by(Signalement.date_declaration.desc()).all()
-    return signalements
+    
+    # Convertir en réponse avec gestion des champs optionnels
+    return [{
+        "id": s.id,
+        "numero_suivi": s.numero_suivi or "",
+        "declarant_nom": s.declarant_nom,
+        "declarant_email": s.declarant_email or "",
+        "declarant_phone": s.declarant_phone or "",
+        "type_signalement": s.type_signalement.value,
+        "statut": s.statut.value,
+        "date_declaration": s.date_declaration.isoformat()
+    } for s in signalements]
 
 
 @router.get("/{signalement_id}")
@@ -453,32 +474,237 @@ def get_signalement_details(
     current_user: User = Depends(get_current_user)
 ):
     """Détails d'un signalement"""
-    if current_user.role not in ["admin", "superviseur"]:
-        raise HTTPException(status_code=403, detail="Accès refusé")
-    
     signalement = db.query(Signalement).filter(Signalement.id == signalement_id).first()
     
     if not signalement:
         raise HTTPException(status_code=404, detail="Signalement introuvable")
+    
+    # Vérifier les permissions : admin/superviseur TOUJOURS, citoyen SEULEMENT si c'est son signalement
+    if current_user.role not in ["admin", "superviseur"]:
+        if signalement.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Accès refusé")
     
     # Retourner avec les détails selon le type
     result = {
         "id": signalement.id,
         "numero_suivi": signalement.numero_suivi,
         "declarant_nom": signalement.declarant_nom,
-        "declarant_email": signalement.declarant_email,
-        "declarant_phone": signalement.declarant_phone,
+        "declarant_email": signalement.declarant_email or "",
+        "declarant_phone": signalement.declarant_phone or "",
         "type_signalement": signalement.type_signalement.value,
         "statut": signalement.statut.value,
         "date_declaration": signalement.date_declaration.isoformat(),
     }
     
     if signalement.type_signalement == TypeSignalementEnum.PERSONNE_DISPARUE:
-        result["personne"] = signalement.personne_disparue
+        personne = signalement.personne_disparue
+        if personne:
+            result["personne"] = {
+                "id": personne.id,
+                "nom": personne.nom,
+                "prenoms": personne.prenoms,
+                "age": personne.age,
+                "description": personne.description,
+                "date_disparition": personne.date_disparition.isoformat() if personne.date_disparition else None,
+                "lieu_disparition": personne.lieu_disparition,
+                "niveau_gravite": personne.niveau_gravite.value,
+                "photo": personne.photo,
+                "vecteur_facial": personne.vecteur_facial,
+                "has_embeddings": personne.vecteur_facial is not None and len(personne.vecteur_facial) > 0
+            }
     elif signalement.type_signalement == TypeSignalementEnum.ENGIN_VOLE:
-        result["engin"] = signalement.engin_vole
+        engin = signalement.engin_vole
+        if engin:
+            result["engin"] = {
+                "id": engin.id,
+                "type_engin": engin.type_engin,
+                "marque": engin.marque,
+                "modele": engin.modele,
+                "couleur": engin.couleur,
+                "plaque_immatriculation": engin.plaque_immatriculation,
+                "date_vol": engin.date_vol.isoformat() if engin.date_vol else None,
+                "lieu_vol": engin.lieu_vol,
+                "circonstances": engin.circonstances
+            }
     
     return result
+
+
+@router.put("/{signalement_id}/update-personne", status_code=200)
+def update_personne_signalement(
+    signalement_id: str,
+    declarant_nom: str = Form(...),
+    declarant_email: Optional[str] = Form(None),
+    declarant_phone: Optional[str] = Form(None),
+    nom: str = Form(...),
+    prenoms: str = Form(...),
+    age: str = Form(...),
+    date_disparition: date = Form(...),
+    lieu_disparition: str = Form(...),
+    description: Optional[str] = Form(None),
+    photos: Optional[List[UploadFile]] = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mettre à jour un signalement de personne disparue (uniquement si statut en_attente)"""
+    from app.utils.phone_utils import validate_phone_number
+    import uuid
+    
+    signalement = db.query(Signalement).filter(Signalement.id == signalement_id).first()
+    
+    if not signalement:
+        raise HTTPException(status_code=404, detail="Signalement introuvable")
+    
+    # Vérifier que l'utilisateur est propriétaire du signalement
+    if signalement.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Vous ne pouvez modifier que vos propres signalements")
+    
+    # Vérifier que le statut permet la modification
+    if signalement.statut != StatutSignalementEnum.EN_ATTENTE:
+        raise HTTPException(status_code=400, detail="Ce signalement ne peut plus être modifié (déjà examiné)")
+    
+    # Vérifier que c'est bien une personne disparue
+    if signalement.type_signalement != TypeSignalementEnum.PERSONNE_DISPARUE:
+        raise HTTPException(status_code=400, detail="Ce signalement n'est pas une personne disparue")
+    
+    # Valider le téléphone si fourni
+    if declarant_phone:
+        is_valid, result = validate_phone_number(declarant_phone)
+        if not is_valid:
+            raise HTTPException(400, f"Téléphone invalide: {result}")
+        declarant_phone = result
+    
+    try:
+        # Mettre à jour les infos du signalement
+        signalement.declarant_nom = declarant_nom
+        signalement.declarant_email = declarant_email
+        signalement.declarant_phone = declarant_phone
+        
+        # Mettre à jour la personne disparue
+        personne = signalement.personne_disparue
+        if not personne:
+            raise HTTPException(status_code=404, detail="Personne disparue introuvable")
+        
+        personne.nom = nom
+        personne.prenoms = prenoms
+        personne.age = age
+        personne.date_disparition = date_disparition
+        personne.lieu_disparition = lieu_disparition
+        personne.description = description
+        
+        # Ajouter de nouvelles photos si fournies
+        if photos and len(photos) > 0:
+            os.makedirs("uploads/signalements", exist_ok=True)
+            new_photo_urls = []
+            
+            for photo in photos:
+                ext = photo.filename.split('.')[-1] if '.' in photo.filename else 'jpg'
+                filename = f"{uuid.uuid4()}.{ext}"
+                filepath = f"uploads/signalements/{filename}"
+                
+                with open(filepath, "wb") as buffer:
+                    shutil.copyfileobj(photo.file, buffer)
+                
+                new_photo_urls.append(f"/static/signalements/{filename}")
+            
+            # Ajouter aux photos existantes
+            personne.photo = (personne.photo or []) + new_photo_urls
+        
+        db.commit()
+        
+        return {
+            "message": "Signalement modifié avec succès",
+            "numero_suivi": signalement.numero_suivi
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Erreur lors de la modification: {str(e)}")
+
+
+@router.put("/{signalement_id}/update-engin", status_code=200)
+def update_engin_signalement(
+    signalement_id: str,
+    declarant_nom: str = Form(...),
+    declarant_email: Optional[str] = Form(None),
+    declarant_phone: Optional[str] = Form(None),
+    type_engin: str = Form(...),
+    marque: str = Form(...),
+    modele: str = Form(...),
+    plaque_immatriculation: str = Form(...),
+    couleur: Optional[str] = Form(None),
+    date_vol: date = Form(...),
+    lieu_vol: Optional[str] = Form(None),
+    circonstances: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mettre à jour un signalement d'engin volé (uniquement si statut en_attente)"""
+    from app.utils.phone_utils import validate_phone_number
+    
+    signalement = db.query(Signalement).filter(Signalement.id == signalement_id).first()
+    
+    if not signalement:
+        raise HTTPException(status_code=404, detail="Signalement introuvable")
+    
+    # Vérifier que l'utilisateur est propriétaire du signalement
+    if signalement.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Vous ne pouvez modifier que vos propres signalements")
+    
+    # Vérifier que le statut permet la modification
+    if signalement.statut != StatutSignalementEnum.EN_ATTENTE:
+        raise HTTPException(status_code=400, detail="Ce signalement ne peut plus être modifié (déjà examiné)")
+    
+    # Vérifier que c'est bien un engin volé
+    if signalement.type_signalement != TypeSignalementEnum.ENGIN_VOLE:
+        raise HTTPException(status_code=400, detail="Ce signalement n'est pas un engin volé")
+    
+    # Valider le téléphone si fourni
+    if declarant_phone:
+        is_valid, result = validate_phone_number(declarant_phone)
+        if not is_valid:
+            raise HTTPException(400, f"Téléphone invalide: {result}")
+        declarant_phone = result
+    
+    # Vérifier si la nouvelle plaque n'existe pas déjà (sauf pour ce signalement)
+    existing = db.query(EnginVole).filter(
+        EnginVole.plaque_immatriculation == plaque_immatriculation.upper(),
+        EnginVole.signalement_id != signalement_id
+    ).first()
+    
+    if existing:
+        raise HTTPException(400, "Un autre signalement existe déjà pour cette plaque")
+    
+    try:
+        # Mettre à jour les infos du signalement
+        signalement.declarant_nom = declarant_nom
+        signalement.declarant_email = declarant_email
+        signalement.declarant_phone = declarant_phone
+        
+        # Mettre à jour l'engin volé
+        engin = signalement.engin_vole
+        if not engin:
+            raise HTTPException(status_code=404, detail="Engin volé introuvable")
+        
+        engin.type_engin = type_engin
+        engin.marque = marque
+        engin.modele = modele
+        engin.couleur = couleur
+        engin.plaque_immatriculation = plaque_immatriculation.upper()
+        engin.date_vol = date_vol
+        engin.lieu_vol = lieu_vol
+        engin.circonstances = circonstances
+        
+        db.commit()
+        
+        return {
+            "message": "Signalement modifié avec succès",
+            "numero_suivi": signalement.numero_suivi
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Erreur lors de la modification: {str(e)}")
 
 
 class ValidationRequest(BaseModel):
@@ -568,6 +794,86 @@ def rejeter_signalement(
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
+@router.post("/{signalement_id}/extraire-vecteurs")
+def extraire_vecteurs_faciaux(
+    signalement_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Extraire les vecteurs faciaux d'une personne disparue"""
+    if current_user.role not in ["admin", "superviseur"]:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    
+    signalement = db.query(Signalement).filter(Signalement.id == signalement_id).first()
+    
+    if not signalement:
+        raise HTTPException(status_code=404, detail="Signalement introuvable")
+    
+    if signalement.type_signalement != TypeSignalementEnum.PERSONNE_DISPARUE:
+        raise HTTPException(status_code=400, detail="Cette action n'est disponible que pour les personnes disparues")
+    
+    personne = signalement.personne_disparue
+    if not personne:
+        raise HTTPException(status_code=404, detail="Personne disparue introuvable")
+    
+    if not personne.photo or len(personne.photo) == 0:
+        raise HTTPException(status_code=400, detail="Aucune photo disponible pour l'extraction")
+    
+    # Importer le service d'extraction
+    from app.services.face_extraction import FaceEmbeddingExtractor
+    
+    try:
+        # Utiliser ArcFace (buffalo_s) pour extraction rapide
+        extractor = FaceEmbeddingExtractor(model_name="buffalo_s")
+        
+        # Extraire les embeddings
+        all_embeddings = []
+        success_count = 0
+        
+        for photo_url in personne.photo:
+            # Convertir l'URL en chemin de fichier
+            filename = photo_url.split('/')[-1]
+            file_path = os.path.join("uploads/signalements", filename)
+            
+            if not os.path.exists(file_path):
+                print(f"[AVERTISSEMENT] Fichier introuvable: {file_path}")
+                continue
+            
+            # Extraire l'embedding
+            embedding = extractor.extract_from_file(file_path)
+            
+            if embedding is not None:
+                all_embeddings.extend(embedding)
+                success_count += 1
+        
+        if success_count == 0:
+            raise HTTPException(status_code=500, detail="Aucun vecteur facial n'a pu être extrait")
+        
+        # Calculer la moyenne des embeddings si plusieurs photos
+        if success_count > 1:
+            embedding_size = len(all_embeddings) // success_count
+            avg_embedding = []
+            for i in range(embedding_size):
+                sum_val = sum(all_embeddings[i + j * embedding_size] for j in range(success_count))
+                avg_embedding.append(sum_val / success_count)
+            personne.vecteur_facial = avg_embedding
+        else:
+            personne.vecteur_facial = all_embeddings
+        
+        db.commit()
+        
+        return {
+            "message": "Vecteurs faciaux extraits avec succès",
+            "photos_traitees": success_count,
+            "dimensions": len(personne.vecteur_facial)
+        }
+        
+    except Exception as e:
+        db.rollback()
+        print(f"[ERREUR EXTRACTION] {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'extraction: {str(e)}")
+
 
 def _notify_new_signalement(db: Session, signalement: Signalement, entity):
     """Notifier les admin et superviseurs d'un nouveau signalement"""

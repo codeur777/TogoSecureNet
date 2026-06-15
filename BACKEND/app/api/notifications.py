@@ -28,8 +28,7 @@ class NotificationResponse(BaseModel):
             datetime: lambda v: v.isoformat()
         }
 
-
-@router.get("/", response_model=List[NotificationResponse])
+@router.get("/")
 def get_notifications(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -39,8 +38,30 @@ def get_notifications(
         Notification.utilisateur_id == current_user.id
     ).order_by(Notification.date_creation.desc()).all()
     
-    return notifications
-
+    result = []
+    for n in notifications:
+        # Déterminer le type de notification
+        notification_type = "info"  # valeur par défaut
+        
+        # Si c'est une alerte
+        if n.alerte:
+            notification_type = "alert"
+        
+        # Si le metadata contient le type
+        if n.metadata and isinstance(n.metadata, dict) and 'type' in n.metadata:
+            notification_type = n.metadata['type']
+        
+        result.append({
+            "id": str(n.id),
+            "titre": n.titre,
+            "message": n.message,
+            "type": notification_type,
+            "lu": n.lu,
+            "date_creation": n.date_creation.isoformat(),
+            "utilisateur_id": str(n.utilisateur_id)
+        })
+    
+    return result
 
 @router.patch("/{notification_id}/lire")
 def marquer_comme_lu(

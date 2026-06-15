@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PhoneInput from '../../components/form/PhoneInput';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -28,8 +28,12 @@ interface FormData {
 
 export default function ReportPersonPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  const [isEditMode, setIsEditMode] = useState(false);
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     declarant_nom: '',
     declarant_email: '',
@@ -42,6 +46,58 @@ export default function ReportPersonPage() {
     description: '',
     photoFiles: [],
   });
+
+  // Charger les données existantes si mode édition
+  useEffect(() => {
+    if (editId) {
+      loadSignalementData(editId);
+    }
+  }, [editId]);
+
+  const loadSignalementData = async (id: string) => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(`/api/v1/signalements/${id}`);
+      const data = res.data;
+
+      // Vérifier que c'est bien une personne disparue
+      if (data.type_signalement !== 'personne_disparue') {
+        toast.error('Ce signalement n\'est pas une personne disparue');
+        navigate('/mes-signalements');
+        return;
+      }
+
+      // Vérifier que le statut permet la modification
+      if (data.statut !== 'en_attente') {
+        toast.error('Ce signalement ne peut plus être modifié (déjà examiné)');
+        navigate('/mes-signalements');
+        return;
+      }
+
+      // Remplir le formulaire avec les données existantes
+      setFormData({
+        declarant_nom: data.declarant_nom || '',
+        declarant_email: data.declarant_email || '',
+        declarant_phone: data.declarant_phone || '',
+        nom: data.personne?.nom || '',
+        prenoms: data.personne?.prenoms || '',
+        age: data.personne?.age || '',
+        date_disparition: data.personne?.date_disparition?.split('T')[0] || '',
+        lieu_disparition: data.personne?.lieu_disparition || '',
+        description: data.personne?.description || '',
+        photoFiles: [], // Les photos existantes ne peuvent pas être rechargées dans le formulaire
+      });
+
+      setIsEditMode(true);
+      toast.success('Données chargées. Vous pouvez modifier le signalement.');
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Erreur lors du chargement du signalement');
+      navigate('/mes-signalements');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({
@@ -90,7 +146,8 @@ export default function ReportPersonPage() {
       return;
     }
 
-    if (formData.photoFiles.length === 0) {
+    // En mode édition, les photos ne sont pas obligatoires si déjà présentes
+    if (!isEditMode && formData.photoFiles.length === 0) {
       toast.error('Au moins une photo est obligatoire');
       return;
     }
@@ -98,31 +155,59 @@ export default function ReportPersonPage() {
     setIsSubmitting(true);
 
     try {
-      // Créer FormData pour l'API atomique
-      const submitData = new FormData();
-      submitData.append('declarant_nom', formData.declarant_nom);
-      if (formData.declarant_email) submitData.append('declarant_email', formData.declarant_email);
-      if (formData.declarant_phone) submitData.append('declarant_phone', formData.declarant_phone);
-      submitData.append('nom', formData.nom);
-      submitData.append('prenoms', formData.prenoms);
-      submitData.append('age', formData.age);
-      submitData.append('date_disparition', formData.date_disparition);
-      submitData.append('lieu_disparition', formData.lieu_disparition);
-      if (formData.description) submitData.append('description', formData.description);
-      
-      // Ajouter les fichiers photos
-      formData.photoFiles.forEach((file) => {
-        submitData.append('photos', file);
-      });
+      if (isEditMode && editId) {
+        // Mode édition - mettre à jour le signalement existant
+        const submitData = new FormData();
+        submitData.append('declarant_nom', formData.declarant_nom);
+        if (formData.declarant_email) submitData.append('declarant_email', formData.declarant_email);
+        if (formData.declarant_phone) submitData.append('declarant_phone', formData.declarant_phone);
+        submitData.append('nom', formData.nom);
+        submitData.append('prenoms', formData.prenoms);
+        submitData.append('age', formData.age);
+        submitData.append('date_disparition', formData.date_disparition);
+        submitData.append('lieu_disparition', formData.lieu_disparition);
+        if (formData.description) submitData.append('description', formData.description);
+        
+        // Ajouter les nouvelles photos si présentes
+        if (formData.photoFiles.length > 0) {
+          formData.photoFiles.forEach((file) => {
+            submitData.append('photos', file);
+          });
+        }
 
-      const response = await api.post(`${API_BASE_URL}/signalements/personne-complete`, submitData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+        await api.put(`${API_BASE_URL}/signalements/${editId}/update-personne`, submitData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
 
-      toast.success(`Signalement enregistré!\nNuméro de suivi: ${response.data.numero_suivi}`, {
-        duration: 6000,
-      });
-      setTimeout(() => navigate('/'), 2000);
+        toast.success('Signalement modifié avec succès!', { duration: 4000 });
+        setTimeout(() => navigate('/mes-signalements'), 1500);
+      } else {
+        // Mode création - utiliser l'endpoint existant
+        const submitData = new FormData();
+        submitData.append('declarant_nom', formData.declarant_nom);
+        if (formData.declarant_email) submitData.append('declarant_email', formData.declarant_email);
+        if (formData.declarant_phone) submitData.append('declarant_phone', formData.declarant_phone);
+        submitData.append('nom', formData.nom);
+        submitData.append('prenoms', formData.prenoms);
+        submitData.append('age', formData.age);
+        submitData.append('date_disparition', formData.date_disparition);
+        submitData.append('lieu_disparition', formData.lieu_disparition);
+        if (formData.description) submitData.append('description', formData.description);
+        
+        // Ajouter les fichiers photos
+        formData.photoFiles.forEach((file) => {
+          submitData.append('photos', file);
+        });
+
+        const response = await api.post(`${API_BASE_URL}/signalements/personne-complete`, submitData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        toast.success(`Signalement enregistré!\nNuméro de suivi: ${response.data.numero_suivi}`, {
+          duration: 6000,
+        });
+        setTimeout(() => navigate('/'), 2000);
+      }
     } catch (error: any) {
       console.error('Erreur:', error);
       toast.error(error.response?.data?.detail || 'Erreur lors de l\'enregistrement');
@@ -144,17 +229,33 @@ export default function ReportPersonPage() {
     return formData.date_disparition !== '' && formData.lieu_disparition.trim() !== '' && formData.photoFiles.length > 0;
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 py-12 px-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement des données...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 py-12 px-4">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Signalement de Personne Disparue
+            {isEditMode ? 'Modifier le Signalement' : 'Signalement de Personne Disparue'}
           </h1>
           <p className="text-gray-600">
-            Aidez-nous à retrouver une personne disparue
+            {isEditMode ? 'Modifiez les informations de votre signalement' : 'Aidez-nous à retrouver une personne disparue'}
           </p>
+          {isEditMode && (
+            <div className="mt-3 inline-block bg-blue-100 text-blue-800 px-4 py-2 rounded-lg text-sm">
+              ℹ️ Mode édition - Vous pouvez modifier les informations
+            </div>
+          )}
         </div>
 
         {/* Progress Bar */}
@@ -387,9 +488,13 @@ export default function ReportPersonPage() {
                     )}
                     
                     {formData.photoFiles.length === 0 && (
-                      <div className="border-2 border-dashed border-red-300 rounded-lg p-4 text-center bg-red-50">
-                        <p className="text-sm text-red-600">
-                          ⚠️ Au moins une photo est obligatoire
+                      <div className={`border-2 border-dashed rounded-lg p-4 text-center ${
+                        isEditMode ? 'border-blue-300 bg-blue-50' : 'border-red-300 bg-red-50'
+                      }`}>
+                        <p className={`text-sm ${isEditMode ? 'text-blue-600' : 'text-red-600'}`}>
+                          {isEditMode 
+                            ? 'ℹ️ Photos existantes conservées. Ajoutez-en de nouvelles si nécessaire.' 
+                            : '⚠️ Au moins une photo est obligatoire'}
                         </p>
                       </div>
                     )}
@@ -447,10 +552,10 @@ export default function ReportPersonPage() {
               ) : (
                 <button
                   type="submit"
-                  disabled={isSubmitting || !isStep3Valid()}
+                  disabled={isSubmitting || (!isEditMode && !isStep3Valid())}
                   className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all"
                 >
-                  {isSubmitting ? 'Envoi en cours...' : '✓ Envoyer le signalement'}
+                  {isSubmitting ? 'Envoi en cours...' : (isEditMode ? '✓ Enregistrer les modifications' : '✓ Envoyer le signalement')}
                 </button>
               )}
             </div>
